@@ -18,7 +18,8 @@ their results are based on candles, technical rules, and the configured fees/sli
 Coinbase Signals fetches public Coinbase USD spot market data, caches up to 3000
 configured-timeframe bars and 500 daily bars per product in SQLite, evaluates a closed-bar
 trend-following pullback strategy, and reports paper P&L and event-driven backtests. The default
-timeframe is four hours.
+timeframe is four hours. The production configuration uses manual ledger mode, starts at zero,
+and never opens automatic paper positions.
 
 ## Strategy rules
 
@@ -63,13 +64,26 @@ risk percentage or fixed USD, capped by max notional percentage.
 ## Settings
 
 Settings are persisted in SQLite and can be changed from the Settings page or `PUT /api/settings`:
-starting equity, sizing mode, risk percentage, fixed USD per trade, max positions, max notional
+portfolio mode (`manual` or `paper`), starting equity, sizing mode, risk percentage, fixed USD per
+trade, max positions, max notional
 percentage, fee/slippage bps, stop ATR multiple, target R, trail ATR multiple, partial-target
 toggle, universe size, timeframe, live news toggle, and catalyst block hours. Defaults are
-FOUR_HOUR, stop 3 ATR, target 1.5R, trail 3 ATR, partials enabled, 60 bps fees, 5 bps slippage,
-news enabled, and 48-hour catalyst blocks. `POST
+manual mode with zero starting equity, FOUR_HOUR, stop 3 ATR, target 1.5R, trail 3 ATR, partials
+enabled, 60 bps fees, 5 bps slippage, news enabled, and 48-hour catalyst blocks. `POST
 /api/paper/reset` clears paper positions, signals, equity, and processed-bar state while preserving
 candle cache.
+
+## Manual ledger
+
+Manual mode tracks real Coinbase trades without API keys or live order placement. Use the Ledger
+page's **Add deposit** or **Log trade** buttons; the hosted static dashboard opens the GitHub
+ledger issue form. A GitHub Action validates the entry, appends it, refreshes the snapshot, then
+comments on and closes the issue. Expect roughly 1–2 minutes for that workflow plus the hourly
+market-price refresh. Deposits and withdrawals use the USD amount in the price field; buys and
+sells use quantity and execution price. Holdings use average-cost basis including fees, and the
+dashboard reports cash, realized/unrealized P&L, fees, and equity. Unknown products are accepted
+with a warning so historical trades remain visible. The ledger records trades only and never
+submits Coinbase orders.
 
 ## Run
 
@@ -139,6 +153,8 @@ approximately five minutes, so the dashboard adds a five-minute cache-buster.
 - `GET /api/signals?limit=`
 - `GET /api/positions`
 - `GET /api/portfolio`
+- `GET /api/ledger`
+- `POST /api/ledger` (live manual mode only)
 - `GET /api/settings`
 - `PUT /api/settings`
 - `POST /api/paper/reset`

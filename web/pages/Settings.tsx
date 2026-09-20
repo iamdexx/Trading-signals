@@ -28,6 +28,22 @@ export function Settings({
     <section className="panel settings">
       <p className="eyebrow">CONFIGURATION</p>
       <h1>Settings</h1>
+      <label>
+        Portfolio mode
+        <small className="muted">
+          Manual mode tracks real Coinbase trades you enter; it never opens paper positions.
+        </small>
+        <select
+          value={draft.mode}
+          disabled={staticMode}
+          onChange={(event) =>
+            setDraft({ ...draft, mode: event.target.value as SettingsType['mode'] })
+          }
+        >
+          <option value="manual">Manual ledger</option>
+          <option value="paper">Paper strategy</option>
+        </select>
+      </label>
       <div className="settings-grid">
         {(
           [
@@ -159,6 +175,9 @@ export function Settings({
             Paper tick workflow
           </a>{' '}
           with <code>reset_paper</code> to reset.
+          {draft.mode === 'manual' && (
+            <> Trades are logged through the Ledger page or the GitHub ledger issue form.</>
+          )}
         </div>
       ) : (
         <div className="settings-actions">

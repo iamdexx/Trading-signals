@@ -1,4 +1,6 @@
 {
+  "mode": "manual",
+  "startingEquity": 0,
   "timeframe": "FOUR_HOUR",
   "feeBps": 60,
   "slippageBps": 5,

@@ -9,6 +9,7 @@ import type {
   ScoreBreakdown,
   Signal,
 } from '../core/types.js';
+import type { LedgerEntry, LedgerHolding, LedgerPortfolio } from '../core/ledger.js';
 
 export interface UniverseProduct {
   product_id: string;
@@ -51,6 +52,8 @@ export interface PortfolioResponse {
   drawdown: number;
   curve: Array<{ time: number; equity: number }>;
   startDate: number;
+  mode?: 'paper' | 'manual';
+  manual?: LedgerPortfolio;
 }
 
 export interface AnalysisResponse {
@@ -111,6 +114,7 @@ export interface DiagnosticsResponse {
 }
 
 export interface Settings {
+  mode: 'paper' | 'manual';
   startingEquity: number;
   sizingMode: 'risk_pct' | 'fixed_usd';
   riskPerTrade: number;
@@ -130,10 +134,17 @@ export interface Settings {
   startDate: number;
 }
 
+export type { LedgerEntry, LedgerHolding, LedgerPortfolio };
+
 export interface PositionResponse extends Position {
   unrealized: number;
   unrealizedPct: number;
   rMultiple: number;
+}
+
+export interface ManualPositionResponse extends LedgerHolding {
+  currentPrice: number;
+  signal?: ScanRow;
 }
 
 export interface NewsSummaryResponse {

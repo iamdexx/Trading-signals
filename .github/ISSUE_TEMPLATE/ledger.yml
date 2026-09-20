@@ -1,0 +1,52 @@
+name: Manual ledger entry
+description: Record a real Coinbase deposit, withdrawal, buy, or sell
+title: Ledger entry
+labels:
+  - ledger
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - deposit
+        - withdrawal
+        - buy
+        - sell
+    validations:
+      required: true
+  - type: input
+    id: product
+    attributes:
+      label: Product
+      description: Coinbase product such as BTC-USD; leave blank for deposit or withdrawal
+      placeholder: BTC-USD
+  - type: input
+    id: quantity
+    attributes:
+      label: Quantity
+      description: Asset quantity for a buy or sell
+      placeholder: '0.01'
+  - type: input
+    id: price
+    attributes:
+      label: Price
+      description: USD execution price for trades, or gross USD amount for deposits and withdrawals
+      placeholder: '50000'
+  - type: input
+    id: fee
+    attributes:
+      label: Fee (USD)
+      description: Trading or transfer fee
+      value: '0'
+  - type: input
+    id: timestamp
+    attributes:
+      label: Timestamp
+      description: ISO timestamp, or leave blank to use now
+      placeholder: '2026-01-01T12:00:00Z'
+  - type: input
+    id: note
+    attributes:
+      label: Note
+      placeholder: Coinbase Advanced fill
