@@ -1,0 +1,11 @@
+{
+  "timeframe": "FOUR_HOUR",
+  "feeBps": 60,
+  "slippageBps": 5,
+  "stopAtrMult": 3,
+  "targetR": 1.5,
+  "trailAtrMult": 3,
+  "partialEnabled": true,
+  "newsEnabled": true,
+  "newsBlockHours": 48
+}

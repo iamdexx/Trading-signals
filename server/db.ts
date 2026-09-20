@@ -5,8 +5,9 @@ import { exitLegPnl } from '../core/pnl.js';
 import type { Candle, Catalyst, FearGreedPoint, NewsArticle, Signal } from '../core/types.js';
 import type { PositionResponse, Settings, UniverseProduct } from '../shared/api.js';
 
-fs.mkdirSync(path.resolve('data'), { recursive: true });
-export const db = new Database(path.resolve('data/signals.db'));
+const databasePath = path.resolve(process.env.DB_PATH ?? 'data/signals.db');
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+export const db = new Database(databasePath);
 db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS candles (
@@ -239,6 +240,20 @@ export function saveNewsArticle(article: NewsArticle): void {
   );
 }
 
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#([0-9]+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10)),
+    )
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+}
+
 export function newsArticles(productId?: string, limit = 100): NewsArticle[] {
   const rows = db
     .prepare(
@@ -260,8 +275,8 @@ export function newsArticles(productId?: string, limit = 100): NewsArticle[] {
   return rows.map((row) => ({
     id: row.id,
     source: row.source,
-    title: row.title,
-    summary: row.summary,
+    title: decodeEntities(row.title),
+    summary: decodeEntities(row.summary),
     link: row.link,
     published: row.published,
     sentiment: row.sentiment,
@@ -288,8 +303,8 @@ export function blockingArticles(productId: string, sinceMs: number): NewsArticl
     .map((row) => ({
       id: row.id,
       source: row.source,
-      title: row.title,
-      summary: row.summary,
+      title: decodeEntities(row.title),
+      summary: decodeEntities(row.summary),
       link: row.link,
       published: row.published,
       sentiment: row.sentiment,
@@ -471,7 +486,11 @@ export function savePosition(position: Record<string, unknown>): number {
         @realized,@status,@reason)
     `,
     )
-    .run(position);
+    .run({
+      ...position,
+      partialTaken: position.partialTaken ? 1 : 0,
+      reason: position.reason ?? null,
+    });
   return Number(result.lastInsertRowid);
 }
 
@@ -483,7 +502,12 @@ export function updatePosition(position: Record<string, unknown>): void {
       realized=@realized,status=@status,exit_time=@exitTime,reason=@reason
     WHERE id=@id
   `,
-  ).run(position);
+  ).run({
+    ...position,
+    partialTaken: position.partialTaken ? 1 : 0,
+    exitTime: position.exitTime ?? null,
+    reason: position.reason ?? null,
+  });
 }
 
 export function saveEquity(
@@ -594,4 +618,63 @@ export function resetPaper(): void {
   for (const row of rows) {
     insert.run(row.product, row.time);
   }
+}
+
+export interface ExportedState {
+  settings: Settings;
+  positions: Array<Record<string, unknown>>;
+  signals: Array<Record<string, unknown>>;
+  equity: Array<Record<string, unknown>>;
+  processed: Array<Record<string, unknown>>;
+}
+
+export function exportState(): ExportedState {
+  return {
+    settings: getSettings(),
+    positions: db.prepare('SELECT * FROM positions ORDER BY id').all() as Array<
+      Record<string, unknown>
+    >,
+    signals: db.prepare('SELECT * FROM signals ORDER BY id').all() as Array<
+      Record<string, unknown>
+    >,
+    equity: db.prepare('SELECT * FROM equity ORDER BY time').all() as Array<
+      Record<string, unknown>
+    >,
+    processed: db.prepare('SELECT * FROM processed_bars ORDER BY product').all() as Array<
+      Record<string, unknown>
+    >,
+  };
+}
+
+export function importState(state: ExportedState): void {
+  const transaction = db.transaction((snapshot: ExportedState) => {
+    db.exec(
+      'DELETE FROM positions; DELETE FROM signals; DELETE FROM equity; DELETE FROM processed_bars;',
+    );
+    saveSettings(snapshot.settings);
+    const positionInsert = db.prepare(
+      `INSERT INTO positions(
+        id,product,entry_time,exit_time,entry,entry_fill,entry_fee,current,qty,remaining_qty,
+        stop,target,initial_risk,atr_entry,highest_high,partial,realized,status,reason
+      ) VALUES (
+        @id,@product,@entry_time,@exit_time,@entry,@entry_fill,@entry_fee,@current,@qty,@remaining_qty,
+        @stop,@target,@initial_risk,@atr_entry,@highest_high,@partial,@realized,@status,@reason
+      )`,
+    );
+    for (const position of snapshot.positions) positionInsert.run(position);
+    const signalInsert = db.prepare(
+      `INSERT INTO signals(id,product,time,side,price,reason,score,components)
+       VALUES (@id,@product,@time,@side,@price,@reason,@score,@components)`,
+    );
+    for (const signal of snapshot.signals) signalInsert.run(signal);
+    const equityInsert = db.prepare(
+      'INSERT INTO equity(time,value,realized,unrealized) VALUES (@time,@value,@realized,@unrealized)',
+    );
+    for (const point of snapshot.equity) equityInsert.run(point);
+    const processedInsert = db.prepare(
+      'INSERT INTO processed_bars(product,time) VALUES (@product,@time)',
+    );
+    for (const row of snapshot.processed) processedInsert.run(row);
+  });
+  transaction(state);
 }

@@ -23,6 +23,7 @@ import {
   getSignals,
   putSettings,
   resetPaper,
+  staticMode,
 } from './api';
 import { Backtest } from './pages/Backtest';
 import { Overview } from './pages/Overview';
@@ -121,6 +122,17 @@ export function App() {
     setSelected(productId);
     setPage('Product');
   };
+  const heartbeat = health?.heartbeat;
+  const heartbeatAge = heartbeat ? Math.max(0, Date.now() - heartbeat.finishedAt) : Infinity;
+  const heartbeatClass =
+    !heartbeat || !heartbeat.ok
+      ? 'stale'
+      : heartbeatAge < heartbeat.intervalMinutes * 2 * 60 * 1000
+        ? 'fresh'
+        : heartbeatAge < heartbeat.intervalMinutes * 4 * 60 * 1000
+          ? 'aging'
+          : 'stale';
+  const heartbeatLabel = heartbeat ? `TICK ${Math.floor(heartbeatAge / 60000)}m ago` : 'TICK —';
 
   return (
     <div className="app">
@@ -155,6 +167,12 @@ export function App() {
             F&G: {newsSummary.fearGreed.value} · {newsSummary.fearGreed.classification}
           </span>
         )}
+        <span
+          className={`heartbeat-badge ${heartbeatClass}`}
+          title={heartbeat?.errors.join(' · ') || 'Snapshot heartbeat'}
+        >
+          {heartbeatLabel}
+        </span>
       </header>
       {health && health.errors.length > 0 && (
         <div className="warning">
@@ -205,6 +223,7 @@ export function App() {
             {settings && (
               <Settings
                 settings={settings}
+                staticMode={staticMode}
                 onSave={async (next) => {
                   const saved = await putSettings(next);
                   setSettings(saved);

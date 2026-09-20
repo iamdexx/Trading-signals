@@ -116,6 +116,21 @@ universe plus BTC-USD, and evaluates the 12-combination grid of fee 60/40/10 bps
 and partials on/off. It prints exit-reason counts and mean R plus a FOUR_HOUR/60 bps/3 ATR/partial
 baseline table sorted by product P&L.
 
+## Deployment (GitHub Actions cron + Vercel static)
+
+The production dashboard can run without a database service. The hourly `Paper tick` GitHub
+Actions workflow refreshes public market data, imports the previous paper state, runs one paper
+tick, and publishes JSON snapshots to the orphan `data` branch. The workflow runs at minute 7 of
+each hour because the default timeframe is FOUR_HOUR; it can also be started manually with
+`reset_paper` to clear positions, signals, equity, and processed bars.
+
+Vercel hosts the static `web/dist` dashboard with `VITE_SNAPSHOT_BASE` set to
+`https://raw.githubusercontent.com/iamdexx/Trading-signals/data`. The Settings page is read-only
+in static mode: edit `config/settings.json` on `main`, then run the Paper tick workflow. The
+heartbeat badge reports the latest tick age and errors; green is under two intervals, amber is
+under four, and red means stale or failed. GitHub's raw content endpoint may cache snapshots for
+approximately five minutes, so the dashboard adds a five-minute cache-buster.
+
 ## API
 
 - `GET /api/health`
