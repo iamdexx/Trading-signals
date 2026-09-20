@@ -53,6 +53,7 @@ function initialPage(): Page {
 
 export function App() {
   const [page, setPage] = useState<Page>(initialPage);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [health, setHealth] = useState<HealthResponse>();
   const [portfolio, setPortfolio] = useState<PortfolioResponse>();
   const [positions, setPositions] = useState<Array<PositionResponse | ManualPositionResponse>>([]);
@@ -141,7 +142,17 @@ export function App() {
         : heartbeatAge < heartbeat.intervalMinutes * 4 * 60 * 1000
           ? 'aging'
           : 'stale';
-  const heartbeatLabel = heartbeat ? `TICK ${Math.floor(heartbeatAge / 60000)}m ago` : 'TICK —';
+  const marketHealthy = health?.marketRegime === 'bullish';
+  const mood = newsSummary?.fearGreed
+    ? `${newsSummary.fearGreed.classification} ${newsSummary.fearGreed.value}`
+    : '—';
+  const updatedLabel = heartbeat
+    ? `Updated ${Math.max(0, Math.floor(heartbeatAge / 60000))} min ago`
+    : 'Updated —';
+  const showPage = (nextPage: Page) => {
+    setPage(nextPage);
+    setMoreOpen(false);
+  };
 
   return (
     <div className="app">
@@ -150,43 +161,40 @@ export function App() {
           <span className="pulse" /> COINBASE <b>SIGNALS</b>
         </div>
         <nav>
-          {(
-            ['Overview', 'Scanner', 'Product', 'Backtest', 'News', 'Ledger', 'Settings'] as Page[]
-          ).map((item) => (
-            <button
-              className={page === item ? 'active' : ''}
-              key={item}
-              onClick={() => setPage(item)}
-            >
-              {item}
-            </button>
-          ))}
+          <button
+            className={page === 'Overview' ? 'active' : ''}
+            onClick={() => showPage('Overview')}
+          >
+            Home
+          </button>
+          <button className={page === 'Ledger' ? 'active' : ''} onClick={() => showPage('Ledger')}>
+            My Portfolio
+          </button>
+          <button
+            className={page === 'Scanner' ? 'active' : ''}
+            onClick={() => showPage('Scanner')}
+          >
+            Coins
+          </button>
+          <button className={page === 'News' ? 'active' : ''} onClick={() => showPage('News')}>
+            News
+          </button>
+          <button className="more-button" onClick={() => setMoreOpen(!moreOpen)}>
+            More ▾
+          </button>
+          {moreOpen && (
+            <div className="more-menu">
+              <button onClick={() => showPage('Settings')}>Settings</button>
+              <button onClick={() => showPage('Backtest')}>History test</button>
+            </div>
+          )}
         </nav>
-        <span className="live">
-          <span className="mode-label">
-            ● {settings?.mode === 'manual' ? 'MANUAL MODE' : 'PAPER MODE'}
-          </span>
-          <span className="timeframe-label"> · {settings?.timeframe ?? '—'}</span>
-        </span>
-        <span className={`market-badge ${health?.marketRegime ?? 'unknown'}`}>
-          MARKET:{' '}
-          {health?.marketRegime === 'bullish'
-            ? 'BULLISH'
-            : health?.marketRegime === 'bearish'
-              ? 'BEARISH — standing aside, no long setups'
-              : 'UNKNOWN'}
-        </span>
-        {newsSummary?.fearGreed && (
-          <span className="market-badge">
-            F&G: {newsSummary.fearGreed.value} · {newsSummary.fearGreed.classification}
-          </span>
-        )}
-        <span
-          className={`heartbeat-badge ${heartbeatClass}`}
-          title={heartbeat?.errors.join(' · ') || 'Snapshot heartbeat'}
-        >
-          {heartbeatLabel}
-        </span>
+        <div className={`status-line ${heartbeatClass}`} title={heartbeat?.errors.join(' · ')}>
+          <span className="status-dot" />
+          {updatedLabel} · Market:{' '}
+          {marketHealthy ? 'Healthy' : health?.marketRegime === 'bearish' ? 'Weak' : 'Unknown'} ·
+          Mood: {mood}
+        </div>
       </header>
       {health && health.errors.length > 0 && (
         <div className="warning">
@@ -202,15 +210,20 @@ export function App() {
                 portfolio={portfolio}
                 positions={positions}
                 signals={signals}
+                scan={scan}
+                news={globalNews}
+                newsSummary={newsSummary}
                 marketRegime={health?.marketRegime ?? 'unknown'}
                 mode={settings?.mode}
+                onSelect={navigateProduct}
+                onPortfolio={() => setPage('Ledger')}
               />
             )}
           </PageErrorBoundary>
         )}
         {page === 'Scanner' && (
           <PageErrorBoundary page="Scanner">
-            <Scanner rows={scan} onSelect={navigateProduct} />
+            <Scanner rows={scan} positions={positions} onSelect={navigateProduct} />
           </PageErrorBoundary>
         )}
         {page === 'Product' && (
@@ -236,7 +249,12 @@ export function App() {
         )}
         {page === 'Ledger' && (
           <PageErrorBoundary page="Ledger">
-            <Ledger entries={ledger} portfolio={portfolio?.manual} product={selected} />
+            <Ledger
+              entries={ledger}
+              portfolio={portfolio?.manual}
+              product={selected}
+              onSelect={navigateProduct}
+            />
           </PageErrorBoundary>
         )}
         {page === 'Settings' && (

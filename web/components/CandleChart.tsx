@@ -16,15 +16,15 @@ export function CandleChart({ candles, overlays }: { candles: Candle[]; overlays
     if (!element.current) return;
     chart.current = createChart(element.current, {
       height: 420,
-      layout: { background: { type: ColorType.Solid, color: '#111827' }, textColor: '#9ca3af' },
-      grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+      layout: { background: { type: ColorType.Solid, color: '#17191c' }, textColor: '#9c9c96' },
+      grid: { vertLines: { color: '#26292e' }, horzLines: { color: '#26292e' } },
     });
     const candlesSeries = chart.current.addCandlestickSeries({
-      upColor: '#47e0a0',
-      downColor: '#fb7185',
+      upColor: '#22c55e',
+      downColor: '#ef4444',
       borderVisible: false,
-      wickUpColor: '#47e0a0',
-      wickDownColor: '#fb7185',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
       priceFormat: { type: 'price', ...priceFormat(candles.at(-1)?.close ?? 1) },
     });
     candlesSeries.setData(
@@ -36,7 +36,7 @@ export function CandleChart({ candles, overlays }: { candles: Candle[]; overlays
         close: candle.close,
       })),
     );
-    const colors = ['#f6c768', '#60a5fa', '#c084fc'];
+    const colors = ['#f59e0b', '#9c9c96', '#ececea'];
     [overlays.ema20, overlays.ema50, overlays.ema200].forEach((values, seriesIndex) => {
       const line = chart.current?.addLineSeries({ color: colors[seriesIndex], lineWidth: 1 });
       line?.setData(

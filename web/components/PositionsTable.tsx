@@ -3,8 +3,10 @@ import { formatPrice } from '../format';
 
 export function PositionsTable({
   rows,
+  onSelect,
 }: {
   rows: Array<PositionResponse | ManualPositionResponse>;
+  onSelect?: (productId: string) => void;
 }) {
   const manual = rows.length > 0 && 'quantity' in rows[0];
   return (
@@ -12,18 +14,21 @@ export function PositionsTable({
       <table>
         <thead>
           <tr>
-            <th>PRODUCT</th>
-            <th>{manual ? 'QTY' : 'ENTRY'}</th>
-            <th>CURRENT</th>
-            <th>{manual ? 'AVG COST' : 'STOP'}</th>
-            <th>{manual ? 'VALUE' : 'TARGET'}</th>
-            <th>UNREALIZED</th>
-            <th>{manual ? 'SIGNAL' : 'R'}</th>
+            <th>COIN</th>
+            <th>{manual ? 'QTY' : 'ENTRY PRICE'}</th>
+            <th>PRICE NOW</th>
+            <th>{manual ? 'AVERAGE COST' : 'SAFETY EXIT PRICE'}</th>
+            <th>{manual ? 'COINS VALUE' : 'PROFIT TARGET'}</th>
+            <th>OPEN GAIN/LOSS</th>
+            <th>{manual ? 'WHAT TO DO' : 'RESULT'}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={'quantity' in row ? row.productId : row.id}>
+            <tr
+              key={'quantity' in row ? row.productId : row.id}
+              onClick={() => onSelect?.(row.productId)}
+            >
               <td className="coin">{row.productId}</td>
               {'quantity' in row ? (
                 <>

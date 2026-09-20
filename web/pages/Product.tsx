@@ -7,6 +7,10 @@ function sentimentLabel(score: number): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
   return score > 0.15 ? 'POSITIVE' : score < -0.15 ? 'NEGATIVE' : 'NEUTRAL';
 }
 
+function number(value: unknown, digits: number): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
+}
+
 export function Product({
   id,
   analysis,
@@ -27,13 +31,20 @@ export function Product({
     <>
       <div className="section-title">
         <div>
-          <p className="eyebrow">PRODUCT DETAIL</p>
+          <p className="eyebrow">COIN DETAIL</p>
           <h1>{id}</h1>
           <span className="muted">
             Last bar closed {latest ? new Date(latest.time * 1000).toLocaleString() : '—'}
           </span>
         </div>
-        <span className={`tag ${analysis.regime}`}>{analysis.regime} regime</span>
+        <span className={`tag ${analysis.regime}`}>
+          Market trend:{' '}
+          {analysis.regime === 'bullish'
+            ? 'Healthy'
+            : analysis.regime === 'bearish'
+              ? 'Weak'
+              : 'Unknown'}
+        </span>
         <button className="primary" onClick={onLogTrade}>
           Log trade
         </button>
@@ -50,10 +61,10 @@ export function Product({
       </section>
       <section className="cards">
         {[
-          ['RSI', analysis.indicators.rsi[index]],
-          ['MACD HIST', analysis.indicators.macd[index]],
-          ['ADX', analysis.indicators.adx[index]],
-          ['ATR %', analysis.indicators.atrPct[index]],
+          ['Momentum (RSI)', analysis.indicators.rsi[index]],
+          ['Momentum (MACD)', analysis.indicators.macd[index]],
+          ['Trend strength (ADX)', analysis.indicators.adx[index]],
+          ['Volatility (ATR)', analysis.indicators.atrPct[index]],
         ].map(([label, value]) => (
           <div className="metric panel" key={String(label)}>
             <small>{label}</small>
@@ -62,11 +73,11 @@ export function Product({
         ))}
       </section>
       <section className="panel">
-        <h2>Score breakdown · {analysis.score.total.toFixed(1)}/100</h2>
+        <h2>Why this recommendation · {number(analysis.score.total, 1)}/100</h2>
         <ScoreBreakdown score={analysis.score} newsEnabled={newsEnabled} />
       </section>
       <section className="panel">
-        <h2>Asset news · {analysis.news.score.toFixed(1)}</h2>
+        <h2>News about this coin · {number(analysis.news.score, 1)}</h2>
         <div className="news-feed">
           {news.slice(0, 10).map((article) => (
             <article className="news-item" key={article.id}>
@@ -83,7 +94,7 @@ export function Product({
                   }
                 >
                   {sentimentLabel(article.sentiment) === 'POSITIVE' ? '+' : ''}
-                  {(article.sentiment * 100).toFixed(0)}
+                  {number(article.sentiment * 100, 0)}
                   {' · '}
                   {sentimentLabel(article.sentiment)}
                 </span>
@@ -104,23 +115,23 @@ export function Product({
         </div>
       </section>
       <section className="panel">
-        <h2>Signals</h2>
+        <h2>Recent calls</h2>
         <SignalsTable rows={analysis.signals} />
       </section>
       <section className="panel">
-        <h2>Backtest · {analysis.backtest.trades.length} trades</h2>
+        <h2>History test · {analysis.backtest.trades.length} trades</h2>
         <div className="cards">
           <div className="metric">
             <small>WIN RATE</small>
-            <strong>{(analysis.backtest.winRate * 100).toFixed(1)}%</strong>
+            <strong>{number(analysis.backtest.winRate * 100, 1)}%</strong>
           </div>
           <div className="metric">
             <small>PROFIT FACTOR</small>
-            <strong>{analysis.backtest.profitFactor.toFixed(2)}</strong>
+            <strong>{number(analysis.backtest.profitFactor, 2)}</strong>
           </div>
           <div className="metric">
-            <small>MAX DRAWDOWN</small>
-            <strong>{analysis.backtest.maxDrawdownPct.toFixed(2)}%</strong>
+            <small>BIGGEST DIP</small>
+            <strong>{number(analysis.backtest.maxDrawdownPct, 2)}%</strong>
           </div>
         </div>
       </section>

@@ -16,10 +16,12 @@ export function Ledger({
   entries,
   portfolio,
   product,
+  onSelect,
 }: {
   entries: LedgerEntry[];
   portfolio?: LedgerPortfolio;
   product?: string;
+  onSelect?: (productId: string) => void;
 }) {
   const [type, setType] = useState<LedgerEntry['type']>('buy');
   const [productId, setProductId] = useState(product ?? '');
@@ -56,8 +58,8 @@ export function Ledger({
     <>
       <div className="section-title">
         <div>
-          <p className="eyebrow">REAL TRADE JOURNAL</p>
-          <h1>Manual Ledger</h1>
+          <p className="eyebrow">MY PORTFOLIO</p>
+          <h1>What you own</h1>
         </div>
         <div className="settings-actions">
           <button className="primary" onClick={() => startEntry('deposit')}>
@@ -73,17 +75,17 @@ export function Ledger({
           {[
             ['CASH', portfolio.cash],
             [
-              'HOLDINGS VALUE',
+              'COINS VALUE',
               portfolio.holdings.reduce((sum, holding) => sum + holding.marketValue, 0),
             ],
-            ['EQUITY', portfolio.equity],
-            ['REALIZED', portfolio.realizedPnl],
+            ['TOTAL VALUE', portfolio.equity],
+            ['LOCKED-IN GAIN/LOSS', portfolio.realizedPnl],
             [
-              'UNREALIZED',
+              'OPEN GAIN/LOSS',
               portfolio.holdings.reduce((sum, holding) => sum + holding.unrealizedPnl, 0),
             ],
-            ['FEES', portfolio.feesPaid],
-            ['DEPOSITED', portfolio.deposits],
+            ['FEES PAID', portfolio.feesPaid],
+            ['MONEY ADDED', portfolio.deposits],
           ].map(([label, value]) => (
             <div className="metric panel" key={String(label)}>
               <small>{label}</small>
@@ -94,7 +96,7 @@ export function Ledger({
       )}
       {!staticMode && (
         <section className="panel">
-          <h2>Log live entry</h2>
+          <h2>Add a trade or money</h2>
           <div className="settings-grid">
             <label>
               Type
@@ -139,21 +141,21 @@ export function Ledger({
         </section>
       )}
       <section className="panel">
-        <h2>Holdings</h2>
+        <h2>What you own</h2>
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
-                <th>PRODUCT</th>
+                <th>COIN</th>
                 <th>QTY</th>
-                <th>AVG COST</th>
-                <th>VALUE</th>
-                <th>UNREALIZED</th>
+                <th>AVERAGE COST</th>
+                <th>COINS VALUE</th>
+                <th>OPEN GAIN/LOSS</th>
               </tr>
             </thead>
             <tbody>
               {(portfolio?.holdings ?? []).map((holding) => (
-                <tr key={holding.productId}>
+                <tr key={holding.productId} onClick={() => onSelect?.(holding.productId)}>
                   <td className="coin">{holding.productId}</td>
                   <td>{holding.quantity.toFixed(8)}</td>
                   <td>${holding.avgCost.toFixed(2)}</td>
@@ -168,14 +170,14 @@ export function Ledger({
         </div>
       </section>
       <section className="panel">
-        <h2>Entries</h2>
+        <h2>Trade history</h2>
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
-                <th>TIME</th>
+                <th>WHEN</th>
                 <th>TYPE</th>
-                <th>PRODUCT</th>
+                <th>COIN</th>
                 <th>QTY</th>
                 <th>PRICE / USD</th>
                 <th>FEE</th>

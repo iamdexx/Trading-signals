@@ -13,10 +13,10 @@ export function EquityChart({ points }: { points: EquityPoint[] }) {
     if (!element.current) return;
     chart.current = createChart(element.current, {
       height: 240,
-      layout: { background: { type: ColorType.Solid, color: '#111827' }, textColor: '#9ca3af' },
-      grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+      layout: { background: { type: ColorType.Solid, color: '#17191c' }, textColor: '#9c9c96' },
+      grid: { vertLines: { color: '#26292e' }, horzLines: { color: '#26292e' } },
     });
-    const series = chart.current.addLineSeries({ color: '#47e0a0', lineWidth: 2 });
+    const series = chart.current.addLineSeries({ color: '#22c55e', lineWidth: 2 });
     series.setData(
       points.map((point) => ({ time: point.time as UTCTimestamp, value: point.equity })),
     );
