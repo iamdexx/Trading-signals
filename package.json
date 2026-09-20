@@ -1,0 +1,45 @@
+{
+  "name": "coinbase-signals",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
+    "build": "tsc -p tsconfig.server.json && vite build",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "lint": "eslint \"{core,server,scripts,web}/**/*.{ts,tsx}\" && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "backtest": "tsx server/cli.ts",
+    "sweep": "tsx scripts/sweep.ts",
+    "format": "prettier --write \"{core,server,scripts,shared,web}/**/*.{ts,tsx}\" \"*.{json,md,ts}\"",
+    "format:check": "prettier --check \"{core,server,scripts,shared,web}/**/*.{ts,tsx}\" \"*.{json,md,ts}\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "lightweight-charts": "^4.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/parser": "^8.19.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
