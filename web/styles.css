@@ -248,12 +248,16 @@ h2 {
 
 .action-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: stretch;
 }
 
 .action-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
   color: #ececea;
   text-align: left;
   padding: 22px;
+  min-height: 238px;
   transition:
     border-color 0.15s ease,
     transform 0.15s ease;
@@ -264,15 +268,22 @@ h2 {
   transform: translateY(-2px);
 }
 
-.action-top {
+.action-first {
   display: flex;
   align-items: baseline;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.action-top strong {
+.action-first strong {
   margin-left: auto;
+  white-space: nowrap;
+}
+
+.coin-name {
+  color: #9c9c96;
+  font-weight: 700;
+  margin-top: 7px;
 }
 
 .action-word {
@@ -284,6 +295,16 @@ h2 {
   min-height: 52px;
   line-height: 1.45;
   color: #ececea;
+  margin: 14px 0;
+}
+
+.see-all {
+  display: block;
+  margin: -8px auto 24px;
+  border: 0;
+  background: none;
+  color: #ececea;
+  text-decoration: underline;
 }
 
 .strength-label {
@@ -599,17 +620,13 @@ summary {
 }
 
 footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: static;
   padding: 10px 5vw;
   background: #17191cf2;
   border-top: 1px solid #26292e;
   color: #9c9c96;
   text-align: center;
   font-size: 13px;
-  z-index: 3;
 }
 
 @media (max-width: 767px) {
@@ -635,14 +652,17 @@ footer {
   }
 
   .status-line {
-    max-width: 48vw;
+    order: 3;
+    flex: 1 0 100%;
+    max-width: 100%;
+    padding: 0 0 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 12px;
   }
 
   main {
-    padding: 28px 12px 120px;
+    padding: 28px 12px 50px;
   }
 
   h1 {
@@ -657,9 +677,38 @@ footer {
   }
 
   .cards,
-  .action-grid,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .action-card {
+    min-height: 228px;
+    padding: 14px;
+  }
+
+  .action-word {
+    font-size: 20px;
+  }
+
+  .action-first {
+    gap: 5px;
+  }
+
+  .action-first strong {
+    font-size: 15px;
+  }
+
+  .coin-name {
+    font-size: 14px;
+  }
+
+  .action-card p {
+    font-size: 14px;
   }
 
   .score-row {

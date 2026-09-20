@@ -11,6 +11,7 @@ import type {
   PositionResponse,
   ScanRow,
   Settings as SettingsType,
+  UniverseProduct,
 } from '../shared/api';
 import {
   getAnalysis,
@@ -24,6 +25,7 @@ import {
   getScan,
   getSettings,
   getSignals,
+  getUniverse,
   putSettings,
   resetPaper,
   staticMode,
@@ -59,6 +61,7 @@ export function App() {
   const [positions, setPositions] = useState<Array<PositionResponse | ManualPositionResponse>>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [scan, setScan] = useState<ScanRow[]>([]);
+  const [universe, setUniverse] = useState<UniverseProduct[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse>();
   const [backtest, setBacktest] = useState<Awaited<ReturnType<typeof getBacktest>>>();
   const [settings, setSettings] = useState<SettingsType>();
@@ -81,6 +84,7 @@ export function App() {
       nextNewsSummary,
       nextNews,
       nextLedger,
+      nextUniverse,
     ] = await Promise.all([
       getHealth(),
       getPortfolio(),
@@ -91,6 +95,7 @@ export function App() {
       getNewsSummary(),
       getNews(),
       getLedger(),
+      getUniverse(),
     ]);
     setHealth(nextHealth);
     setPortfolio(nextPortfolio);
@@ -106,6 +111,7 @@ export function App() {
     setNewsSummary(nextNewsSummary);
     setGlobalNews(nextNews);
     setLedger(nextLedger);
+    setUniverse(nextUniverse);
   };
 
   useEffect(() => {
@@ -192,8 +198,8 @@ export function App() {
         <div className={`status-line ${heartbeatClass}`} title={heartbeat?.errors.join(' · ')}>
           <span className="status-dot" />
           {updatedLabel} · Market:{' '}
-          {marketHealthy ? 'Healthy' : health?.marketRegime === 'bearish' ? 'Weak' : 'Unknown'} ·
-          Mood: {mood}
+          {marketHealthy ? 'Healthy' : health?.marketRegime === 'bearish' ? 'Weak' : 'Unknown'} ·{' '}
+          {mood}
         </div>
       </header>
       {health && health.errors.length > 0 && (
@@ -211,12 +217,14 @@ export function App() {
                 positions={positions}
                 signals={signals}
                 scan={scan}
+                universe={universe}
                 news={globalNews}
                 newsSummary={newsSummary}
                 marketRegime={health?.marketRegime ?? 'unknown'}
                 mode={settings?.mode}
                 onSelect={navigateProduct}
                 onPortfolio={() => setPage('Ledger')}
+                onCoins={() => showPage('Scanner')}
               />
             )}
           </PageErrorBoundary>

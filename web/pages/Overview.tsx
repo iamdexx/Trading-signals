@@ -6,6 +6,7 @@ import type {
   PortfolioResponse,
   PositionResponse,
   ScanRow,
+  UniverseProduct,
 } from '../../shared/api';
 import { EquityChart } from '../components/EquityChart';
 import { SignalsTable } from '../components/SignalsTable';
@@ -16,12 +17,14 @@ interface OverviewProps {
   positions: Array<PositionResponse | ManualPositionResponse>;
   signals: Signal[];
   scan: ScanRow[];
+  universe: UniverseProduct[];
   news: NewsArticle[];
   newsSummary?: NewsSummaryResponse;
   marketRegime: Regime;
   mode?: 'paper' | 'manual';
   onSelect: (productId: string) => void;
   onPortfolio: () => void;
+  onCoins: () => void;
 }
 
 function heldIds(positions: Array<PositionResponse | ManualPositionResponse>): Set<string> {
@@ -32,35 +35,60 @@ function heldIds(positions: Array<PositionResponse | ManualPositionResponse>): S
   );
 }
 
-function recommendation(row: ScanRow, held: boolean, marketRegime: Regime) {
-  if (held && (row.regime === 'bearish' || !row.trendUp || row.status === 'blocked_by_news')) {
+function recommendation(
+  row: ScanRow,
+  held: boolean,
+  marketRegime: Regime,
+  position?: PositionResponse | ManualPositionResponse,
+) {
+  if (held && (row.regime === 'bearish' || !row.trendUp)) {
     return {
       word: 'SELL',
       className: 'sell',
       reason:
-        row.status === 'blocked_by_news'
-          ? `News is bad for ${row.productId} — consider selling`
-          : 'You hold this and the trend has turned down — consider selling',
+        position && 'stop' in position && row.price <= position.stop
+          ? 'Fell below the safety exit price — consider selling'
+          : 'Trend turned down — consider selling',
     };
   }
+  if (held) {
+    return {
+      word: 'WAIT',
+      className: 'muted',
+      reason: 'You own this — trend still healthy, hold',
+    };
+  }
+  const strong = row.score >= 75;
+  const blockedReason = row.catalysts[0]
+    ? `Bad news for this coin (${row.catalysts[0]}) — stay away`
+    : 'Bad news for this coin — stay away';
+  let reason: string | undefined;
+  if (row.blockedByNews) reason = blockedReason;
+  else if (row.status === 'insufficient_history') reason = 'Too new to judge';
+  else if (row.marketRegime === 'bearish')
+    reason = 'Whole market is weak right now — better to wait';
+  else if (!row.trendUp) reason = 'Not in an uptrend yet';
+  else if (row.components.pullback <= 0) reason = 'Price is stretched — wait for a dip';
+  else if (row.status === 'setup') reason = 'Dipped — waiting for the bounce to confirm';
+  else if (row.components.volume <= 0) reason = 'Trading activity is low';
+  else if (row.components.adx <= 0) reason = 'Trend is too weak to trust';
   if (!held && row.status === 'signal' && row.regime !== 'bearish' && marketRegime !== 'bearish') {
     return {
       word: 'BUY',
       className: 'buy',
       reason: row.trendUp
-        ? 'Uptrend and it just dipped — a good entry'
-        : 'A strong setup is forming',
+        ? 'Uptrend, healthy dip and a confirmed bounce — good entry'
+        : 'Uptrend, healthy dip and a confirmed bounce — good entry',
     };
   }
   return {
     word: 'WAIT',
     className: 'muted',
-    reason:
-      marketRegime === 'bearish'
-        ? 'Market is weak right now — better to wait'
-        : row.status === 'blocked_by_news'
-          ? 'Recent bad news means it is safer to wait'
-          : 'No clear signal yet — keep watching',
+    reason: reason
+      ? strong
+        ? `Almost there — ${reason}`
+        : reason
+      : 'No clear signal yet — keep watching',
   };
 }
 
@@ -75,17 +103,19 @@ export function Overview({
   positions,
   signals,
   scan,
+  universe,
   news,
   newsSummary,
   marketRegime,
   mode = 'paper',
   onSelect,
   onPortfolio,
+  onCoins,
 }: OverviewProps) {
   const held = heldIds(positions);
   const watchlist = [...scan]
     .sort((left, right) => right.score - left.score)
-    .filter((row, index, rows) => index < 8 || held.has(row.productId) || rows.length <= 8);
+    .filter((row, index, rows) => index < 6 || held.has(row.productId) || rows.length <= 6);
   const manual = mode === 'manual' ? portfolio.manual : undefined;
   const holdingsValue =
     manual?.holdings.reduce((sum, holding) => sum + holding.marketValue, 0) ?? portfolio.unrealized;
@@ -103,17 +133,22 @@ export function Overview({
       </div>
       <section className="action-grid">
         {watchlist.map((row) => {
-          const action = recommendation(row, held.has(row.productId), marketRegime);
+          const position = positions.find((item) => item.productId === row.productId);
+          const action = recommendation(row, held.has(row.productId), marketRegime, position);
           return (
             <button
               className="action-card"
               key={row.productId}
               onClick={() => onSelect(row.productId)}
             >
-              <div className="action-top">
+              <div className="action-first">
                 <span className={`action-word ${action.className}`}>{action.word}</span>
-                <span className="coin">{row.productId}</span>
                 <strong>${formatPrice(row.price)}</strong>
+              </div>
+              <div className="coin-name">
+                {universe.find((product) => product.product_id === row.productId)?.base_name ??
+                  row.productId.replace(/-USD$/, '')}{' '}
+                · {row.productId.replace(/-USD$/, '')}
               </div>
               <p>{action.reason}</p>
               <div className="strength-label">
@@ -128,6 +163,11 @@ export function Overview({
         })}
         {!watchlist.length && <div className="panel muted">Waiting for coin data…</div>}
       </section>
+      {scan.length > watchlist.length && (
+        <button className="see-all" onClick={onCoins}>
+          See all coins
+        </button>
+      )}
 
       <section className="panel money-panel">
         <div className="section-title">
