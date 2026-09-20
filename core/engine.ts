@@ -194,7 +194,7 @@ export function stepProduct(
   if (!nextBar || candle.time < nextState.cooldownUntil) {
     return { state: nextState, portfolio, events };
   }
-  const score = scoreAt(index, context.candles, indicators, regime);
+  const score = scoreAt(index, context.candles, indicators, regime, context.newsScore);
   const start = Math.max(0, index - 8);
   const recentPullback =
     indicators.rsi.slice(start, index).some((value) => value < 50) ||
@@ -217,6 +217,7 @@ export function stepProduct(
     score.adx > 0 &&
     regime === 'bullish' &&
     marketRegime === 'bullish' &&
+    !context.newsBlocked &&
     indicators.atr[index] / candle.close >= 0.003 &&
     indicators.atr[index] / candle.close <= 0.08;
   if (!hardConditions || context.openPositions >= (context.config.maxPositions ?? 5)) {

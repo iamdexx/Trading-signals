@@ -84,6 +84,29 @@ export function Settings({
             <option value="custom">Custom</option>
           </select>
         </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={draft.newsEnabled}
+            onChange={(event) => setDraft({ ...draft, newsEnabled: event.target.checked })}
+          />
+          Enable live news overlay
+          <small className="muted">
+            Adds sentiment to live scans; historical backtests stay technical.
+          </small>
+        </label>
+        <label>
+          News block hours
+          <small className="muted">
+            Block live entries after hack, delisting, or lawsuit catalysts.
+          </small>
+          <input
+            type="number"
+            min="1"
+            value={draft.newsBlockHours}
+            onChange={(event) => updateNumber('newsBlockHours', event.target.value)}
+          />
+        </label>
         <label>
           Sizing mode
           <select

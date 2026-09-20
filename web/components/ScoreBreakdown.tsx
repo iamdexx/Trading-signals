@@ -2,12 +2,13 @@ import type { ScoreBreakdown as Breakdown } from '../../core/types';
 
 export function ScoreBreakdown({ score }: { score: Breakdown }) {
   const entries = [
-    ['Trend', score.trend, 25],
-    ['Pullback', score.pullback, 25],
-    ['Momentum', score.momentum, 15],
-    ['Volume', score.volume, 15],
-    ['ADX', score.adx, 10],
-    ['Regime', score.regime, 10],
+    ['Trend', score.trend, 22],
+    ['Pullback', score.pullback, 22],
+    ['Momentum', score.momentum, 14],
+    ['Volume', score.volume, 14],
+    ['ADX', score.adx, 9],
+    ['Regime', score.regime, 9],
+    ['News', score.news, 10],
   ];
   return (
     <div className="score-list">

@@ -5,6 +5,8 @@ import type {
   PositionResponse,
   ScanRow,
   DiagnosticsResponse,
+  NewsSummaryResponse,
+  NewsArticle,
   Settings,
   UniverseProduct,
 } from '../shared/api.js';
@@ -25,6 +27,11 @@ export const getSignals = (limit = 50) => request<Signal[]>(`/api/signals?limit=
 export const getPositions = () => request<PositionResponse[]>('/api/positions');
 export const getPortfolio = () => request<PortfolioResponse>('/api/portfolio');
 export const getScan = () => request<ScanRow[]>('/api/scan');
+export const getNews = (product?: string, limit = 50) =>
+  request<NewsArticle[]>(
+    `/api/news?limit=${limit}${product ? `&product=${encodeURIComponent(product)}` : ''}`,
+  );
+export const getNewsSummary = () => request<NewsSummaryResponse>('/api/news/summary');
 export const getDiagnostics = (productId: string) =>
   request<DiagnosticsResponse>(`/api/diagnostics/${productId}`);
 export const getAnalysis = (productId: string) =>

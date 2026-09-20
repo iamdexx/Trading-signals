@@ -5,6 +5,7 @@ import path from 'node:path';
 import { backtestProduct, portfolioBacktest } from '../core/backtest.js';
 import { buildRegimeMap, createEngineContext, stepProduct } from '../core/engine.js';
 import { unrealizedPnl } from '../core/pnl.js';
+import { assetNewsScore } from '../core/sentiment.js';
 import type { EngineState, Position, Regime, StrategyConfig } from '../core/types.js';
 import type {
   AnalysisResponse,
@@ -38,6 +39,7 @@ import {
   universe,
   updatePosition,
 } from './db.js';
+import { allNews, currentNewsState, newsSummary, productNews, syncNews } from './news.js';
 import { calculateIndicators, scoreAt } from '../core/strategy.js';
 
 const app = express();
@@ -62,6 +64,8 @@ function strategyConfig(settings: Settings): StrategyConfig {
     targetR: settings.targetR,
     trailAtrMult: settings.trailAtrMult,
     partialEnabled: settings.partialEnabled,
+    newsEnabled: settings.newsEnabled,
+    newsBlockHours: settings.newsBlockHours,
   };
 }
 
@@ -133,6 +137,19 @@ async function refreshUniverse(): Promise<void> {
       await refreshProduct(btc, settings.timeframe);
     }
     saveUniverse(rows);
+    void syncNews(
+      rows.map((row) => ({
+        product_id: row.product_id,
+        price: Number(row.price),
+        volume24_base: Number(row.volume_24h),
+        volume24_usd: row.volume24Usd,
+        price_percentage_change_24h: Number(row.price_percentage_change_24h),
+        base_name: row.base_name,
+        historyStatus: row.historyStatus,
+      })),
+    ).catch((error) => {
+      setProductError('NEWS', error instanceof Error ? error.message : String(error));
+    });
     const marketCandles = cacheProduct('BTC-USD', settings.timeframe, 3000);
     const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
     marketRegime =
@@ -193,6 +210,21 @@ async function paperTick(): Promise<void> {
         portfolioState,
         marketDaily,
       );
+      const articles = allNews(500);
+      const summary = assetNewsScore(articles, product.product_id);
+      const newsBlocked =
+        settings.newsEnabled &&
+        summary.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)) &&
+        articles.some(
+          (article) =>
+            article.assets.includes(product.product_id) &&
+            article.published >= Date.now() - settings.newsBlockHours * 60 * 60 * 1000 &&
+            article.catalysts.some((catalyst) =>
+              ['hack', 'delisting', 'lawsuit'].includes(catalyst),
+            ),
+        );
+      context.newsBlocked = newsBlocked;
+      context.newsScore = summary.score;
       let state = stateForProduct(product.product_id);
       for (let index = 210; index < bars.length - 1; index += 1) {
         if (bars[index].time <= lastProcessed) {
@@ -253,6 +285,7 @@ function validateSettings(input: Partial<Settings>): string | undefined {
     'stopAtrMult',
     'targetR',
     'trailAtrMult',
+    'newsBlockHours',
   ];
   for (const field of numericFields) {
     const value = input[field];
@@ -268,6 +301,9 @@ function validateSettings(input: Partial<Settings>): string | undefined {
   }
   if (input.partialEnabled !== undefined && typeof input.partialEnabled !== 'boolean') {
     return 'partialEnabled must be boolean';
+  }
+  if (input.newsEnabled !== undefined && typeof input.newsEnabled !== 'boolean') {
+    return 'newsEnabled must be boolean';
   }
   if (
     input.sizingMode !== undefined &&
@@ -287,6 +323,7 @@ app.get('/api/health', (_request, response) => {
     productsLoaded: universe().filter((product) => product.historyStatus === 'ready').length,
     errors: productErrors(),
     marketRegime,
+    fearGreed: currentNewsState().fearGreed,
   };
   response.json(health);
 });
@@ -298,6 +335,16 @@ app.get('/api/universe', (_request, response) => {
 app.get('/api/signals', (request, response) => {
   const limit = Number(request.query.limit ?? 50);
   response.json(signals(limit));
+});
+
+app.get('/api/news', (request, response) => {
+  const productId = typeof request.query.product === 'string' ? request.query.product : undefined;
+  const limit = Math.min(100, Math.max(1, Number(request.query.limit ?? 50)));
+  response.json(productId ? productNews(productId, limit) : allNews(limit));
+});
+
+app.get('/api/news/summary', (_request, response) => {
+  response.json(newsSummary(universe()));
 });
 
 app.get('/api/positions', (_request, response) => {
@@ -329,6 +376,8 @@ app.get('/api/products/:id/analysis', (request, response) => {
   const candles = cacheProduct(request.params.id, settings.timeframe, 3000);
   const daily = cacheProduct(request.params.id, 'ONE_DAY', 500);
   const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
+  const articles = allNews(500);
+  const news = assetNewsScore(articles, request.params.id);
   if (candles.length < 3) {
     response.status(404).json({
       error: `No cached ${settings.timeframe} data is available for ${request.params.id}`,
@@ -347,7 +396,7 @@ app.get('/api/products/:id/analysis', (request, response) => {
     marketDaily,
   );
   const regime = context.dailyRegimes[index];
-  const score = scoreAt(index, candles, indicators, regime);
+  const score = scoreAt(index, candles, indicators, regime, news.score);
   const result: AnalysisResponse = {
     product: request.params.id,
     candles,
@@ -362,6 +411,7 @@ app.get('/api/products/:id/analysis', (request, response) => {
     },
     regime,
     score,
+    news,
     signals: signals(500).filter((signal) => signal.productId === request.params.id),
     position: openPosition(request.params.id) as unknown as AnalysisResponse['position'],
     backtest: backtestProduct(
@@ -378,6 +428,7 @@ app.get('/api/products/:id/analysis', (request, response) => {
 app.get('/api/scan', (_request, response) => {
   const settings = getSettings();
   const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
+  const articles = allNews(500);
   const rows: ScanRow[] = universe().map((product) => {
     if (product.historyStatus === 'insufficient_history') {
       return {
@@ -387,13 +438,26 @@ app.get('/api/scan', (_request, response) => {
         regime: 'unknown',
         marketRegime,
         score: 0,
-        components: { trend: 0, pullback: 0, momentum: 0, volume: 0, adx: 0, regime: 0, total: 0 },
+        components: {
+          trend: 0,
+          pullback: 0,
+          momentum: 0,
+          volume: 0,
+          adx: 0,
+          regime: 0,
+          news: 0,
+          total: 0,
+        },
         rsi: NaN,
         adx: NaN,
         atrPct: NaN,
         trendUp: false,
         status: 'insufficient_history',
         volume24Usd: product.volume24_usd,
+        newsScore: 0,
+        newsCount: 0,
+        catalysts: [],
+        blockedByNews: false,
       };
     }
     const candles = cacheProduct(product.product_id, settings.timeframe, 3000);
@@ -411,11 +475,29 @@ app.get('/api/scan', (_request, response) => {
     );
     const regime = context.dailyRegimes[index];
     const currentMarketRegime = context.marketRegimes[index];
-    const components = scoreAt(index, candles, indicators, regime);
+    const news = assetNewsScore(articles, product.product_id);
+    const components = scoreAt(index, candles, indicators, regime, news.score);
     const trendUp =
       indicators.ema20[index] > indicators.ema50[index] &&
       candles[index].close > indicators.ema50[index];
-    const signal = components.total === 100 && currentMarketRegime === 'bullish';
+    const blockedByNews =
+      settings.newsEnabled &&
+      news.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)) &&
+      articles.some(
+        (article) =>
+          article.assets.includes(product.product_id) &&
+          article.published >= Date.now() - settings.newsBlockHours * 60 * 60 * 1000 &&
+          article.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)),
+      );
+    const signal =
+      components.trend > 0 &&
+      components.pullback > 0 &&
+      components.momentum > 0 &&
+      components.volume > 0 &&
+      components.adx > 0 &&
+      regime === 'bullish' &&
+      currentMarketRegime === 'bullish' &&
+      !blockedByNews;
     const setup =
       trendUp &&
       regime === 'bullish' &&
@@ -434,9 +516,21 @@ app.get('/api/scan', (_request, response) => {
       adx: indicators.adx.adx[index],
       atrPct: (indicators.atr[index] / candles[index].close) * 100,
       trendUp,
-      status: inPosition ? 'in_position' : signal ? 'signal' : setup ? 'setup' : 'none',
+      status: inPosition
+        ? 'in_position'
+        : blockedByNews
+          ? 'blocked_by_news'
+          : signal
+            ? 'signal'
+            : setup
+              ? 'setup'
+              : 'none',
       volume24Usd: product.volume24_usd,
       lastError: productErrors().find((error) => error.productId === product.product_id)?.message,
+      newsScore: news.score,
+      newsCount: news.count,
+      catalysts: news.catalysts,
+      blockedByNews,
     };
   });
   response.json(rows);
@@ -575,6 +669,7 @@ const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => {
   void refreshUniverse();
   setInterval(() => void refreshUniverse(), 60 * 60 * 1000);
+  setInterval(() => void syncNews(universe()), 10 * 60 * 1000);
   setInterval(() => void paperTick(), 5 * 60 * 1000);
 });
 

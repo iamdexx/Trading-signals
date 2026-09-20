@@ -42,6 +42,7 @@ export function Scanner({
             <th>RSI</th>
             <th>ADX</th>
             <th>ATR %</th>
+            <th>NEWS</th>
             <th>TREND</th>
             <th>STATUS</th>
           </tr>
@@ -62,6 +63,12 @@ export function Scanner({
               <td>{Number.isFinite(row.rsi) ? row.rsi.toFixed(2) : '—'}</td>
               <td>{Number.isFinite(row.adx) ? row.adx.toFixed(2) : '—'}</td>
               <td>{Number.isFinite(row.atrPct) ? `${row.atrPct.toFixed(2)}%` : '—'}</td>
+              <td>
+                <span className={`tag ${row.newsScore >= 0 ? 'bullish' : 'bearish'}`}>
+                  {row.newsScore.toFixed(0)}
+                </span>
+                {row.newsCount > 0 && <small className="muted"> · {row.newsCount}</small>}
+              </td>
               <td>{row.trendUp ? 'UP' : '—'}</td>
               <td>
                 <span className={`status ${row.status}`}>{row.status}</span>

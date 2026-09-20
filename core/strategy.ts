@@ -60,11 +60,12 @@ export function scoreAt(
   candles: Candle[],
   indicators: Indicators,
   regime: Regime,
+  newsScore = 0,
 ): ScoreBreakdown {
   const trend =
     indicators.ema20[index] > indicators.ema50[index] &&
     candles[index].close > indicators.ema50[index]
-      ? 25
+      ? 22
       : 0;
   const start = Math.max(0, index - 8);
   const recentPullback =
@@ -78,11 +79,12 @@ export function scoreAt(
     (candles[index].close >
       Math.max(...candles.slice(Math.max(0, index - 3), index).map((bar) => bar.high)) &&
       indicators.rsi[index] > 50);
-  const pullback = recentPullback && trigger ? 25 : 0;
-  const momentum = indicators.macd.line[index] > indicators.macd.signal[index] ? 15 : 0;
-  const volume = candles[index].volume >= indicators.volumeSma[index] * 0.8 ? 15 : 0;
-  const adxScore = indicators.adx.adx[index] >= 18 ? 10 : 0;
-  const regimeScore = regime === 'bullish' ? 10 : 0;
+  const pullback = recentPullback && trigger ? 22 : 0;
+  const momentum = indicators.macd.line[index] > indicators.macd.signal[index] ? 14 : 0;
+  const volume = candles[index].volume >= indicators.volumeSma[index] * 0.8 ? 14 : 0;
+  const adxScore = indicators.adx.adx[index] >= 18 ? 9 : 0;
+  const regimeScore = regime === 'bullish' ? 9 : 0;
+  const news = Math.max(0, Math.min(10, ((newsScore + 100) / 200) * 10));
 
   return {
     trend,
@@ -91,7 +93,8 @@ export function scoreAt(
     volume,
     adx: adxScore,
     regime: regimeScore,
-    total: trend + pullback + momentum + volume + adxScore + regimeScore,
+    news,
+    total: trend + pullback + momentum + volume + adxScore + regimeScore + news,
   };
 }
 
