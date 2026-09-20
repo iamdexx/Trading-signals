@@ -42,6 +42,18 @@ export interface Indicators {
 
 export type Regime = 'bullish' | 'bearish' | 'unknown';
 export type SignalSide = 'BUY' | 'SELL';
+export type Catalyst =
+  | 'listing'
+  | 'delisting'
+  | 'upgrade'
+  | 'partnership'
+  | 'etf'
+  | 'regulation_positive'
+  | 'regulation_negative'
+  | 'hack'
+  | 'lawsuit'
+  | 'unlock'
+  | 'macro';
 export type SignalReason =
   'trend_pullback' | 'stop' | 'target_partial' | 'trail' | 'trend_fail' | 'regime';
 
@@ -54,6 +66,8 @@ export interface StrategyConfig {
   fixedUsdPerTrade?: number;
   maxPositions?: number;
   maxNotionalPct?: number;
+  newsEnabled?: boolean;
+  newsBlockHours?: number;
   stopAtrMult: number;
   targetR: number;
   trailAtrMult: number;
@@ -67,6 +81,7 @@ export interface ScoreBreakdown {
   volume: number;
   adx: number;
   regime: number;
+  news: number;
   total: number;
 }
 
@@ -78,6 +93,31 @@ export interface Signal {
   reason: SignalReason;
   score?: number;
   components?: ScoreBreakdown;
+}
+
+export interface NewsArticle {
+  id: string;
+  source: string;
+  title: string;
+  summary: string;
+  link: string;
+  published: number;
+  sentiment: number;
+  catalysts: Catalyst[];
+  assets: string[];
+}
+
+export interface AssetNewsSummary {
+  productId: string;
+  score: number;
+  count: number;
+  catalysts: Catalyst[];
+}
+
+export interface FearGreedPoint {
+  value: number;
+  classification: string;
+  timestamp: number;
 }
 
 export interface Position {
@@ -124,6 +164,8 @@ export interface EngineContext {
   openPositions: number;
   portfolio: PortfolioState;
   barIntervalSeconds: number;
+  newsBlocked?: boolean;
+  newsScore?: number;
 }
 
 export interface EngineEvent {

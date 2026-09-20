@@ -1,9 +1,23 @@
-import type { AnalysisResponse } from '../../shared/api';
+import type { AnalysisResponse, NewsArticle } from '../../shared/api';
 import { CandleChart } from '../components/CandleChart';
 import { ScoreBreakdown } from '../components/ScoreBreakdown';
 import { SignalsTable } from '../components/SignalsTable';
 
-export function Product({ id, analysis }: { id: string; analysis?: AnalysisResponse }) {
+function sentimentLabel(score: number): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
+  return score > 0.15 ? 'POSITIVE' : score < -0.15 ? 'NEGATIVE' : 'NEUTRAL';
+}
+
+export function Product({
+  id,
+  analysis,
+  news,
+  newsEnabled,
+}: {
+  id: string;
+  analysis?: AnalysisResponse;
+  news: NewsArticle[];
+  newsEnabled?: boolean;
+}) {
   if (!analysis) return <section className="panel">Loading {id}…</section>;
   const latest = analysis.candles.at(-2);
   const index = analysis.candles.length - 2;
@@ -43,8 +57,46 @@ export function Product({ id, analysis }: { id: string; analysis?: AnalysisRespo
         ))}
       </section>
       <section className="panel">
-        <h2>Score breakdown · {analysis.score.total}/100</h2>
-        <ScoreBreakdown score={analysis.score} />
+        <h2>Score breakdown · {analysis.score.total.toFixed(1)}/100</h2>
+        <ScoreBreakdown score={analysis.score} newsEnabled={newsEnabled} />
+      </section>
+      <section className="panel">
+        <h2>Asset news · {analysis.news.score.toFixed(1)}</h2>
+        <div className="news-feed">
+          {news.slice(0, 10).map((article) => (
+            <article className="news-item" key={article.id}>
+              <div className="news-meta">
+                <span>{article.source}</span>
+                <span>{new Date(article.published).toLocaleString()}</span>
+                <span
+                  className={
+                    sentimentLabel(article.sentiment) === 'POSITIVE'
+                      ? 'buy'
+                      : sentimentLabel(article.sentiment) === 'NEGATIVE'
+                        ? 'sell'
+                        : 'muted'
+                  }
+                >
+                  {sentimentLabel(article.sentiment) === 'POSITIVE' ? '+' : ''}
+                  {(article.sentiment * 100).toFixed(0)}
+                  {' · '}
+                  {sentimentLabel(article.sentiment)}
+                </span>
+              </div>
+              <a href={article.link} target="_blank" rel="noreferrer">
+                {article.title}
+              </a>
+              <div className="chip-list">
+                {article.catalysts.map((catalyst) => (
+                  <span className="tag" key={catalyst}>
+                    {catalyst}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+          {!news.length && <span className="muted">No recent asset headlines.</span>}
+        </div>
       </section>
       <section className="panel">
         <h2>Signals</h2>

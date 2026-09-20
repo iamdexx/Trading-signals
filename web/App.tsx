@@ -3,6 +3,8 @@ import type { Signal } from '../core/types';
 import type {
   AnalysisResponse,
   HealthResponse,
+  NewsArticle,
+  NewsSummaryResponse,
   PortfolioResponse,
   PositionResponse,
   ScanRow,
@@ -12,6 +14,8 @@ import {
   getAnalysis,
   getBacktest,
   getHealth,
+  getNews,
+  getNewsSummary,
   getPortfolio,
   getPositions,
   getScan,
@@ -25,13 +29,18 @@ import { Overview } from './pages/Overview';
 import { Product } from './pages/Product';
 import { Scanner } from './pages/Scanner';
 import { Settings } from './pages/Settings';
+import { News } from './pages/News';
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 
-type Page = 'Overview' | 'Scanner' | 'Product' | 'Backtest' | 'Settings';
+type Page = 'Overview' | 'Scanner' | 'Product' | 'Backtest' | 'News' | 'Settings';
 
 function initialPage(): Page {
   const value = new URLSearchParams(window.location.search).get('page');
-  return value === 'Scanner' || value === 'Product' || value === 'Backtest' || value === 'Settings'
+  return value === 'Scanner' ||
+    value === 'Product' ||
+    value === 'Backtest' ||
+    value === 'News' ||
+    value === 'Settings'
     ? value
     : 'Overview';
 }
@@ -46,20 +55,33 @@ export function App() {
   const [analysis, setAnalysis] = useState<AnalysisResponse>();
   const [backtest, setBacktest] = useState<Awaited<ReturnType<typeof getBacktest>>>();
   const [settings, setSettings] = useState<SettingsType>();
+  const [newsSummary, setNewsSummary] = useState<NewsSummaryResponse>();
+  const [globalNews, setGlobalNews] = useState<NewsArticle[]>([]);
+  const [productNews, setProductNews] = useState<NewsArticle[]>([]);
   const [selected, setSelected] = useState(
     () => new URLSearchParams(window.location.search).get('product') ?? '',
   );
 
   const load = async () => {
-    const [nextHealth, nextPortfolio, nextPositions, nextSignals, nextScan, nextSettings] =
-      await Promise.all([
-        getHealth(),
-        getPortfolio(),
-        getPositions(),
-        getSignals(),
-        getScan(),
-        getSettings(),
-      ]);
+    const [
+      nextHealth,
+      nextPortfolio,
+      nextPositions,
+      nextSignals,
+      nextScan,
+      nextSettings,
+      nextNewsSummary,
+      nextNews,
+    ] = await Promise.all([
+      getHealth(),
+      getPortfolio(),
+      getPositions(),
+      getSignals(),
+      getScan(),
+      getSettings(),
+      getNewsSummary(),
+      getNews(),
+    ]);
     setHealth(nextHealth);
     setPortfolio(nextPortfolio);
     setPositions(nextPositions);
@@ -71,6 +93,8 @@ export function App() {
         : (nextScan[0]?.productId ?? current),
     );
     setSettings(nextSettings);
+    setNewsSummary(nextNewsSummary);
+    setGlobalNews(nextNews);
   };
 
   useEffect(() => {
@@ -81,7 +105,12 @@ export function App() {
 
   useEffect(() => {
     if (page === 'Product' && selected) {
-      void getAnalysis(selected).then(setAnalysis);
+      void Promise.all([getAnalysis(selected), getNews(selected, 10)]).then(
+        ([nextAnalysis, nextNews]) => {
+          setAnalysis({ ...nextAnalysis, news: nextAnalysis.news });
+          setProductNews(nextNews);
+        },
+      );
     }
     if (page === 'Backtest') {
       void getBacktest().then(setBacktest);
@@ -100,15 +129,17 @@ export function App() {
           <span className="pulse" /> COINBASE <b>SIGNALS</b>
         </div>
         <nav>
-          {(['Overview', 'Scanner', 'Product', 'Backtest', 'Settings'] as Page[]).map((item) => (
-            <button
-              className={page === item ? 'active' : ''}
-              key={item}
-              onClick={() => setPage(item)}
-            >
-              {item}
-            </button>
-          ))}
+          {(['Overview', 'Scanner', 'Product', 'Backtest', 'News', 'Settings'] as Page[]).map(
+            (item) => (
+              <button
+                className={page === item ? 'active' : ''}
+                key={item}
+                onClick={() => setPage(item)}
+              >
+                {item}
+              </button>
+            ),
+          )}
         </nav>
         <span className="live">● PAPER MODE · {settings?.timeframe ?? '—'}</span>
         <span className={`market-badge ${health?.marketRegime ?? 'unknown'}`}>
@@ -119,6 +150,11 @@ export function App() {
               ? 'BEARISH — standing aside, no long setups'
               : 'UNKNOWN'}
         </span>
+        {newsSummary?.fearGreed && (
+          <span className="market-badge">
+            F&G: {newsSummary.fearGreed.value} · {newsSummary.fearGreed.classification}
+          </span>
+        )}
       </header>
       {health && health.errors.length > 0 && (
         <div className="warning">
@@ -146,12 +182,22 @@ export function App() {
         )}
         {page === 'Product' && (
           <PageErrorBoundary page="Product">
-            <Product id={selected} analysis={analysis} />
+            <Product
+              id={selected}
+              analysis={analysis}
+              news={productNews}
+              newsEnabled={settings?.newsEnabled}
+            />
           </PageErrorBoundary>
         )}
         {page === 'Backtest' && (
           <PageErrorBoundary page="Backtest">
             <Backtest report={backtest} />
+          </PageErrorBoundary>
+        )}
+        {page === 'News' && (
+          <PageErrorBoundary page="News">
+            <News summary={newsSummary} articles={globalNews} onSelect={navigateProduct} />
           </PageErrorBoundary>
         )}
         {page === 'Settings' && (

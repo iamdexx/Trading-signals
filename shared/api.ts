@@ -1,6 +1,9 @@
 import type {
   BacktestReport,
   Candle,
+  AssetNewsSummary,
+  FearGreedPoint,
+  NewsArticle,
   Position,
   Regime,
   ScoreBreakdown,
@@ -25,6 +28,7 @@ export interface HealthResponse {
   productsLoaded: number;
   errors: Array<{ productId: string; message: string }>;
   marketRegime: Regime;
+  fearGreed?: FearGreedPoint;
 }
 
 export interface PortfolioResponse {
@@ -53,6 +57,7 @@ export interface AnalysisResponse {
   signals: Signal[];
   position?: Position;
   backtest: BacktestReport;
+  news: AssetNewsSummary;
 }
 
 export interface ScanRow {
@@ -67,9 +72,13 @@ export interface ScanRow {
   adx: number;
   atrPct: number;
   trendUp: boolean;
-  status: 'signal' | 'in_position' | 'setup' | 'none' | 'insufficient_history';
+  status: 'signal' | 'in_position' | 'setup' | 'none' | 'insufficient_history' | 'blocked_by_news';
   volume24Usd: number;
   lastError?: string;
+  newsScore: number;
+  newsCount: number;
+  catalysts: string[];
+  blockedByNews: boolean;
 }
 
 export interface DiagnosticsResponse {
@@ -99,6 +108,8 @@ export interface Settings {
   targetR: number;
   trailAtrMult: number;
   partialEnabled: boolean;
+  newsEnabled: boolean;
+  newsBlockHours: number;
   feeBps: number;
   slippageBps: number;
   universeSize: number;
@@ -111,3 +122,14 @@ export interface PositionResponse extends Position {
   unrealizedPct: number;
   rMultiple: number;
 }
+
+export interface NewsSummaryResponse {
+  marketSentiment: number;
+  fearGreed?: FearGreedPoint;
+  fearGreedHistory: FearGreedPoint[];
+  topPositive: AssetNewsSummary[];
+  topNegative: AssetNewsSummary[];
+  trending: Array<{ productId: string; symbol: string; name: string; score: number }>;
+}
+
+export type { AssetNewsSummary, FearGreedPoint, NewsArticle };

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { exitLegPnl } from '../core/pnl.js';
-import type { Candle, Signal } from '../core/types.js';
+import type { Candle, Catalyst, FearGreedPoint, NewsArticle, Signal } from '../core/types.js';
 import type { PositionResponse, Settings, UniverseProduct } from '../shared/api.js';
 
 fs.mkdirSync(path.resolve('data'), { recursive: true });
@@ -81,6 +81,23 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS processed_bars (
     product TEXT PRIMARY KEY,
     time INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS news (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    link TEXT NOT NULL,
+    published INTEGER NOT NULL,
+    sentiment REAL NOT NULL,
+    catalysts TEXT NOT NULL,
+    assets TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS news_published_idx ON news(published DESC);
+  CREATE TABLE IF NOT EXISTS fear_greed (
+    timestamp INTEGER PRIMARY KEY,
+    value INTEGER NOT NULL,
+    classification TEXT NOT NULL
   );
 `);
 
@@ -196,6 +213,120 @@ export function productErrors(): Array<{ productId: string; message: string }> {
     productId: string;
     message: string;
   }>;
+}
+
+export function saveNewsArticle(article: NewsArticle): void {
+  const existing = db
+    .prepare('SELECT id FROM news WHERE link=? OR title=? LIMIT 1')
+    .get(article.link, article.title) as { id?: string } | undefined;
+  if (existing) {
+    return;
+  }
+  db.prepare(
+    `INSERT OR IGNORE INTO news(
+      id,source,title,summary,link,published,sentiment,catalysts,assets
+    ) VALUES (?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    article.id,
+    article.source,
+    article.title,
+    article.summary,
+    article.link,
+    article.published,
+    article.sentiment,
+    JSON.stringify(article.catalysts),
+    JSON.stringify(article.assets),
+  );
+}
+
+export function newsArticles(productId?: string, limit = 100): NewsArticle[] {
+  const rows = db
+    .prepare(
+      productId
+        ? 'SELECT * FROM news WHERE assets LIKE ? ORDER BY published DESC LIMIT ?'
+        : 'SELECT * FROM news ORDER BY published DESC LIMIT ?',
+    )
+    .all(...(productId ? [`%"${productId}"%`, limit] : [limit])) as Array<{
+    id: string;
+    source: string;
+    title: string;
+    summary: string;
+    link: string;
+    published: number;
+    sentiment: number;
+    catalysts: string;
+    assets: string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    source: row.source,
+    title: row.title,
+    summary: row.summary,
+    link: row.link,
+    published: row.published,
+    sentiment: row.sentiment,
+    catalysts: JSON.parse(row.catalysts) as Catalyst[],
+    assets: JSON.parse(row.assets) as string[],
+  }));
+}
+
+export function blockingArticles(productId: string, sinceMs: number): NewsArticle[] {
+  const rows = db
+    .prepare('SELECT * FROM news WHERE published >= ? AND assets LIKE ? ORDER BY published DESC')
+    .all(sinceMs, `%"${productId}"%`) as Array<{
+    id: string;
+    source: string;
+    title: string;
+    summary: string;
+    link: string;
+    published: number;
+    sentiment: number;
+    catalysts: string;
+    assets: string;
+  }>;
+  return rows
+    .map((row) => ({
+      id: row.id,
+      source: row.source,
+      title: row.title,
+      summary: row.summary,
+      link: row.link,
+      published: row.published,
+      sentiment: row.sentiment,
+      catalysts: JSON.parse(row.catalysts) as Catalyst[],
+      assets: JSON.parse(row.assets) as string[],
+    }))
+    .filter((article) => isBlockingArticle(article, sinceMs));
+}
+
+export function isBlockingArticle(
+  article: Pick<NewsArticle, 'published' | 'catalysts'>,
+  sinceMs: number,
+): boolean {
+  const blocking = new Set<Catalyst>(['hack', 'delisting', 'lawsuit']);
+  return (
+    article.published >= sinceMs && article.catalysts.some((catalyst) => blocking.has(catalyst))
+  );
+}
+
+export function saveFearGreed(points: FearGreedPoint[]): void {
+  const statement = db.prepare(
+    'INSERT OR REPLACE INTO fear_greed(timestamp,value,classification) VALUES (?,?,?)',
+  );
+  const transaction = db.transaction((rows: FearGreedPoint[]) => {
+    for (const point of rows) {
+      statement.run(point.timestamp, point.value, point.classification);
+    }
+  });
+  transaction(points);
+}
+
+export function fearGreedHistory(limit = 30): FearGreedPoint[] {
+  return db
+    .prepare(
+      'SELECT value,classification,timestamp FROM fear_greed ORDER BY timestamp DESC LIMIT ?',
+    )
+    .all(limit) as FearGreedPoint[];
 }
 
 export function insertSignal(signal: {
@@ -396,6 +527,8 @@ const defaultSettings: Settings = {
   targetR: Number(process.env.TARGET_R ?? 1.5),
   trailAtrMult: Number(process.env.TRAIL_ATR_MULT ?? 3),
   partialEnabled: process.env.PARTIAL_ENABLED !== 'false',
+  newsEnabled: process.env.NEWS_ENABLED !== 'false',
+  newsBlockHours: Number(process.env.NEWS_BLOCK_HOURS ?? 48),
   feeBps: Number(process.env.FEE_BPS ?? 60),
   slippageBps: Number(process.env.SLIPPAGE_BPS ?? 5),
   universeSize: Number(process.env.UNIVERSE_SIZE ?? 30),

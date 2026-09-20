@@ -1,3 +1,14 @@
+## Live news and sentiment
+
+The dashboard includes a keyless live NEWS tab using RSS, Alternative.me Fear & Greed, and
+CoinGecko trending data. News is polled every ten minutes, tagged to assets, and used only as a
+live scanner/paper-trading overlay. Recent hack, delisting, and lawsuit catalysts block live BUY
+entries for the configured window (48 hours by default). Extreme Fear is displayed but does not
+block entries.
+
+Historical backtests intentionally remain news-free because historical article data is unavailable;
+their results are based on candles, technical rules, and the configured fees/slippage only.
+
 # Coinbase Signals
 
 > **Disclaimer:** This application is educational software and is not financial advice. It only
@@ -35,7 +46,11 @@ An entry requires all of these conditions:
 6. The product and BTC market regimes are bullish, no position is open, and the six-bar stop
    cooldown has ended.
 
-Signals are scored out of 100: trend 25, pullback 25, momentum 15, volume 15, ADX 10, and regime 10. A signal on bar `t` fills at the next bar's open with configured slippage.
+Live scanner scores are out of 100: trend 22, pullback 22, momentum 14, volume 14, ADX 9,
+regime 9, and news 10. News is a live-only overlay; historical backtests do not use it. When
+`newsEnabled` is false, live scoring uses the technical-only 25/25/15/15/10/10 weighting and
+news contributes zero, so the score remains out of 100. A signal on
+bar `t` fills at the next bar's open with configured slippage.
 
 Initial risk is `stopAtrMult` ATR at entry. When `partialEnabled` is true, `targetR` triggers a
 50% exit and the stop moves to breakeven. The remaining quantity trails at highest high since
@@ -50,8 +65,9 @@ risk percentage or fixed USD, capped by max notional percentage.
 Settings are persisted in SQLite and can be changed from the Settings page or `PUT /api/settings`:
 starting equity, sizing mode, risk percentage, fixed USD per trade, max positions, max notional
 percentage, fee/slippage bps, stop ATR multiple, target R, trail ATR multiple, partial-target
-toggle, universe size, and timeframe. Defaults are FOUR_HOUR, stop 3 ATR, target 1.5R, trail 3
-ATR, partials enabled, 60 bps fees, and 5 bps slippage. `POST
+toggle, universe size, timeframe, live news toggle, and catalyst block hours. Defaults are
+FOUR_HOUR, stop 3 ATR, target 1.5R, trail 3 ATR, partials enabled, 60 bps fees, 5 bps slippage,
+news enabled, and 48-hour catalyst blocks. `POST
 /api/paper/reset` clears paper positions, signals, equity, and processed-bar state while preserving
 candle cache.
 
@@ -62,6 +78,20 @@ npm install
 cp .env.example .env
 npm run dev
 ```
+
+The sweep command reuses the local cache and compares the configured four-hour strategy settings:
+
+```bash
+npm run sweep
+```
+
+### Results
+
+The current four-hour sample uses 3,000 cached bars per product and the latest 500 daily bars,
+with the then-current 30-product USD-volume universe. At 60 bps fees, 5 bps slippage, a 3 ATR
+stop, 1.5R partial target, and 3 ATR trail, the portfolio backtest produced 8 trades, 37.5% win
+rate, PF 2.356, expectancy 0.237R, 0.58% maximum drawdown, and $187.00 net P&L. These are
+sample-specific historical candle results, not a guarantee of future performance.
 
 The development API runs on `:4000` and Vite runs on `:5173`. Production uses:
 

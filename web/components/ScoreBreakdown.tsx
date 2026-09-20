@@ -1,13 +1,21 @@
 import type { ScoreBreakdown as Breakdown } from '../../core/types';
 
-export function ScoreBreakdown({ score }: { score: Breakdown }) {
+export function ScoreBreakdown({
+  score,
+  newsEnabled,
+}: {
+  score: Breakdown;
+  newsEnabled?: boolean;
+}) {
+  const technicalOnly = newsEnabled === false || score.trend === 25 || score.pullback === 25;
   const entries = [
-    ['Trend', score.trend, 25],
-    ['Pullback', score.pullback, 25],
-    ['Momentum', score.momentum, 15],
-    ['Volume', score.volume, 15],
-    ['ADX', score.adx, 10],
-    ['Regime', score.regime, 10],
+    ['Trend', score.trend, technicalOnly ? 25 : 22],
+    ['Pullback', score.pullback, technicalOnly ? 25 : 22],
+    ['Momentum', score.momentum, technicalOnly ? 15 : 14],
+    ['Volume', score.volume, technicalOnly ? 15 : 14],
+    ['ADX', score.adx, technicalOnly ? 10 : 9],
+    ['Regime', score.regime, technicalOnly ? 10 : 9],
+    ['News', score.news, 10],
   ];
   return (
     <div className="score-list">
@@ -18,7 +26,7 @@ export function ScoreBreakdown({ score }: { score: Breakdown }) {
             <i style={{ width: `${(Number(value) / Number(max)) * 100}%` }} />
           </div>
           <b>
-            {value}/{max}
+            {Number(value).toFixed(1)}/{max}
           </b>
         </div>
       ))}
