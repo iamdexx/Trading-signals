@@ -1,0 +1,55 @@
+name: Paper tick
+
+on:
+  schedule:
+    # Hourly is sufficient because the default timeframe is FOUR_HOUR.
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      reset_paper:
+        description: Reset paper positions, signals, equity, and processed bars
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Restore paper state
+        run: |
+          git fetch origin data || true
+          git worktree add ../data origin/data || mkdir -p ../data
+          if [ -f ../data/state/state.json ]; then
+            mkdir -p state
+            cp ../data/state/state.json state/state.json
+          fi
+      - name: Run paper tick
+        env:
+          OUT_DIR: ../out
+          RESET_PAPER: ${{ inputs.reset_paper == true && '1' || '0' }}
+        run: npm run tick
+      - name: Publish snapshot
+        run: |
+          cd ../out
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push --force origin HEAD:data

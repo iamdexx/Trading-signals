@@ -29,6 +29,19 @@ export interface HealthResponse {
   errors: Array<{ productId: string; message: string }>;
   marketRegime: Regime;
   fearGreed?: FearGreedPoint;
+  heartbeat?: Heartbeat;
+}
+
+export interface Heartbeat {
+  startedAt: number;
+  finishedAt: number;
+  durationMs: number;
+  ok: boolean;
+  errors: string[];
+  productsLoaded: number;
+  timeframe: string;
+  intervalMinutes: number;
+  nextExpectedAt: number;
 }
 
 export interface PortfolioResponse {

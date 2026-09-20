@@ -5,10 +5,12 @@ export function Settings({
   settings,
   onSave,
   onReset,
+  staticMode = false,
 }: {
   settings?: SettingsType;
   onSave: (settings: SettingsType) => Promise<void>;
   onReset: () => Promise<void>;
+  staticMode?: boolean;
 }) {
   const [draft, setDraft] = useState<SettingsType | undefined>(settings);
   if (!draft) return <section className="panel">Loading settings…</section>;
@@ -57,6 +59,7 @@ export function Settings({
               type="number"
               step="any"
               value={Number(draft[key])}
+              readOnly={staticMode}
               onChange={(event) => updateNumber(key, event.target.value)}
             />
           </label>
@@ -66,6 +69,7 @@ export function Settings({
           <small className="muted">Choose a venue tier or keep a custom fee below.</small>
           <select
             value={feePreset}
+            disabled={staticMode}
             onChange={(event) => {
               const values: Record<string, number> = {
                 'coinbase-taker': 60,
@@ -88,6 +92,7 @@ export function Settings({
           <input
             type="checkbox"
             checked={draft.newsEnabled}
+            disabled={staticMode}
             onChange={(event) => setDraft({ ...draft, newsEnabled: event.target.checked })}
           />
           Enable live news overlay
@@ -104,6 +109,7 @@ export function Settings({
             type="number"
             min="1"
             value={draft.newsBlockHours}
+            readOnly={staticMode}
             onChange={(event) => updateNumber('newsBlockHours', event.target.value)}
           />
         </label>
@@ -111,6 +117,7 @@ export function Settings({
           Sizing mode
           <select
             value={draft.sizingMode}
+            disabled={staticMode}
             onChange={(event) =>
               setDraft({
                 ...draft,
@@ -126,6 +133,7 @@ export function Settings({
           Timeframe
           <select
             value={draft.timeframe}
+            disabled={staticMode}
             onChange={(event) => setDraft({ ...draft, timeframe: event.target.value })}
           >
             <option value="ONE_HOUR">1 hour</option>
@@ -137,27 +145,38 @@ export function Settings({
           <input
             type="checkbox"
             checked={draft.partialEnabled}
+            disabled={staticMode}
             onChange={(event) => setDraft({ ...draft, partialEnabled: event.target.checked })}
           />
           Enable 1.5R partial target
           <small className="muted">Sell half at target R, then trail the remainder.</small>
         </label>
       </div>
-      <div className="settings-actions">
-        <button className="primary" onClick={() => void onSave(draft)}>
-          Save settings
-        </button>
-        <button
-          className="danger"
-          onClick={() => {
-            if (window.confirm('Reset the paper account and delete all positions and signals?')) {
-              void onReset();
-            }
-          }}
-        >
-          Reset paper account
-        </button>
-      </div>
+      {staticMode ? (
+        <div className="warning">
+          Edit <code>config/settings.json</code> on main to change settings; run the{' '}
+          <a href="https://github.com/iamdexx/Trading-signals/actions/workflows/tick.yml">
+            Paper tick workflow
+          </a>{' '}
+          with <code>reset_paper</code> to reset.
+        </div>
+      ) : (
+        <div className="settings-actions">
+          <button className="primary" onClick={() => void onSave(draft)}>
+            Save settings
+          </button>
+          <button
+            className="danger"
+            onClick={() => {
+              if (window.confirm('Reset the paper account and delete all positions and signals?')) {
+                void onReset();
+              }
+            }}
+          >
+            Reset paper account
+          </button>
+        </div>
+      )}
       <p className="muted">Paper account start: {new Date(draft.startDate).toLocaleString()}</p>
     </section>
   );

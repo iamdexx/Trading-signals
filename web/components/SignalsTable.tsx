@@ -1,4 +1,5 @@
 import type { Signal } from '../../core/types';
+import { formatPrice } from '../format';
 
 export function SignalsTable({ rows }: { rows: Signal[] }) {
   return (
@@ -19,7 +20,7 @@ export function SignalsTable({ rows }: { rows: Signal[] }) {
             <td>{new Date(row.time * 1000).toLocaleString()}</td>
             <td className="coin">{row.productId}</td>
             <td className={row.side === 'BUY' ? 'buy' : 'sell'}>{row.side}</td>
-            <td>${row.price.toFixed(2)}</td>
+            <td>${formatPrice(row.price)}</td>
             <td>{row.reason}</td>
             <td>{row.score?.toFixed(0) ?? '—'}</td>
           </tr>
