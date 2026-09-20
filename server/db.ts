@@ -270,6 +270,45 @@ export function newsArticles(productId?: string, limit = 100): NewsArticle[] {
   }));
 }
 
+export function blockingArticles(productId: string, sinceMs: number): NewsArticle[] {
+  const rows = db
+    .prepare('SELECT * FROM news WHERE published >= ? AND assets LIKE ? ORDER BY published DESC')
+    .all(sinceMs, `%"${productId}"%`) as Array<{
+    id: string;
+    source: string;
+    title: string;
+    summary: string;
+    link: string;
+    published: number;
+    sentiment: number;
+    catalysts: string;
+    assets: string;
+  }>;
+  return rows
+    .map((row) => ({
+      id: row.id,
+      source: row.source,
+      title: row.title,
+      summary: row.summary,
+      link: row.link,
+      published: row.published,
+      sentiment: row.sentiment,
+      catalysts: JSON.parse(row.catalysts) as Catalyst[],
+      assets: JSON.parse(row.assets) as string[],
+    }))
+    .filter((article) => isBlockingArticle(article, sinceMs));
+}
+
+export function isBlockingArticle(
+  article: Pick<NewsArticle, 'published' | 'catalysts'>,
+  sinceMs: number,
+): boolean {
+  const blocking = new Set<Catalyst>(['hack', 'delisting', 'lawsuit']);
+  return (
+    article.published >= sinceMs && article.catalysts.some((catalyst) => blocking.has(catalyst))
+  );
+}
+
 export function saveFearGreed(points: FearGreedPoint[]): void {
   const statement = db.prepare(
     'INSERT OR REPLACE INTO fear_greed(timestamp,value,classification) VALUES (?,?,?)',

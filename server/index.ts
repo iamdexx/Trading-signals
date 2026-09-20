@@ -39,7 +39,14 @@ import {
   universe,
   updatePosition,
 } from './db.js';
-import { allNews, currentNewsState, newsSummary, productNews, syncNews } from './news.js';
+import {
+  allNews,
+  currentNewsState,
+  newsContext,
+  newsSummary,
+  productNews,
+  syncNews,
+} from './news.js';
 import { calculateIndicators, scoreAt } from '../core/strategy.js';
 
 const app = express();
@@ -210,21 +217,9 @@ async function paperTick(): Promise<void> {
         portfolioState,
         marketDaily,
       );
-      const articles = allNews(500);
-      const summary = assetNewsScore(articles, product.product_id);
-      const newsBlocked =
-        settings.newsEnabled &&
-        summary.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)) &&
-        articles.some(
-          (article) =>
-            article.assets.includes(product.product_id) &&
-            article.published >= Date.now() - settings.newsBlockHours * 60 * 60 * 1000 &&
-            article.catalysts.some((catalyst) =>
-              ['hack', 'delisting', 'lawsuit'].includes(catalyst),
-            ),
-        );
-      context.newsBlocked = newsBlocked;
-      context.newsScore = summary.score;
+      const news = newsContext(product.product_id, settings);
+      context.newsBlocked = news.blocked;
+      context.newsScore = news.score;
       let state = stateForProduct(product.product_id);
       for (let index = 210; index < bars.length - 1; index += 1) {
         if (bars[index].time <= lastProcessed) {
@@ -376,8 +371,10 @@ app.get('/api/products/:id/analysis', (request, response) => {
   const candles = cacheProduct(request.params.id, settings.timeframe, 3000);
   const daily = cacheProduct(request.params.id, 'ONE_DAY', 500);
   const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
-  const articles = allNews(500);
-  const news = assetNewsScore(articles, request.params.id);
+  const newsContextValue = newsContext(request.params.id, settings);
+  const news = settings.newsEnabled
+    ? assetNewsScore(allNews(5000), request.params.id)
+    : { productId: request.params.id, score: 0, count: 0, catalysts: [] };
   if (candles.length < 3) {
     response.status(404).json({
       error: `No cached ${settings.timeframe} data is available for ${request.params.id}`,
@@ -396,7 +393,14 @@ app.get('/api/products/:id/analysis', (request, response) => {
     marketDaily,
   );
   const regime = context.dailyRegimes[index];
-  const score = scoreAt(index, candles, indicators, regime, news.score);
+  const score = scoreAt(
+    index,
+    candles,
+    indicators,
+    regime,
+    newsContextValue.score,
+    settings.newsEnabled,
+  );
   const result: AnalysisResponse = {
     product: request.params.id,
     candles,
@@ -428,7 +432,7 @@ app.get('/api/products/:id/analysis', (request, response) => {
 app.get('/api/scan', (_request, response) => {
   const settings = getSettings();
   const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
-  const articles = allNews(500);
+  const articles = allNews(5000);
   const rows: ScanRow[] = universe().map((product) => {
     if (product.historyStatus === 'insufficient_history') {
       return {
@@ -475,20 +479,26 @@ app.get('/api/scan', (_request, response) => {
     );
     const regime = context.dailyRegimes[index];
     const currentMarketRegime = context.marketRegimes[index];
-    const news = assetNewsScore(articles, product.product_id);
-    const components = scoreAt(index, candles, indicators, regime, news.score);
+    const newsContextValue = newsContext(product.product_id, settings);
+    const news = {
+      score: newsContextValue.score,
+      count: settings.newsEnabled
+        ? articles.filter((article) => article.assets.includes(product.product_id)).length
+        : 0,
+      catalysts: newsContextValue.catalysts,
+    };
+    const components = scoreAt(
+      index,
+      candles,
+      indicators,
+      regime,
+      newsContextValue.score,
+      settings.newsEnabled,
+    );
     const trendUp =
       indicators.ema20[index] > indicators.ema50[index] &&
       candles[index].close > indicators.ema50[index];
-    const blockedByNews =
-      settings.newsEnabled &&
-      news.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)) &&
-      articles.some(
-        (article) =>
-          article.assets.includes(product.product_id) &&
-          article.published >= Date.now() - settings.newsBlockHours * 60 * 60 * 1000 &&
-          article.catalysts.some((catalyst) => ['hack', 'delisting', 'lawsuit'].includes(catalyst)),
-      );
+    const blockedByNews = newsContextValue.blocked;
     const signal =
       components.trend > 0 &&
       components.pullback > 0 &&

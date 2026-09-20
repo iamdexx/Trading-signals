@@ -61,11 +61,14 @@ export function scoreAt(
   indicators: Indicators,
   regime: Regime,
   newsScore = 0,
+  newsEnabled = false,
 ): ScoreBreakdown {
   const trend =
     indicators.ema20[index] > indicators.ema50[index] &&
     candles[index].close > indicators.ema50[index]
-      ? 22
+      ? newsEnabled
+        ? 22
+        : 25
       : 0;
   const start = Math.max(0, index - 8);
   const recentPullback =
@@ -79,12 +82,14 @@ export function scoreAt(
     (candles[index].close >
       Math.max(...candles.slice(Math.max(0, index - 3), index).map((bar) => bar.high)) &&
       indicators.rsi[index] > 50);
-  const pullback = recentPullback && trigger ? 22 : 0;
-  const momentum = indicators.macd.line[index] > indicators.macd.signal[index] ? 14 : 0;
-  const volume = candles[index].volume >= indicators.volumeSma[index] * 0.8 ? 14 : 0;
-  const adxScore = indicators.adx.adx[index] >= 18 ? 9 : 0;
-  const regimeScore = regime === 'bullish' ? 9 : 0;
-  const news = Math.max(0, Math.min(10, ((newsScore + 100) / 200) * 10));
+  const pullback = recentPullback && trigger ? (newsEnabled ? 22 : 25) : 0;
+  const momentum =
+    indicators.macd.line[index] > indicators.macd.signal[index] ? (newsEnabled ? 14 : 15) : 0;
+  const volume =
+    candles[index].volume >= indicators.volumeSma[index] * 0.8 ? (newsEnabled ? 14 : 15) : 0;
+  const adxScore = indicators.adx.adx[index] >= 18 ? (newsEnabled ? 9 : 10) : 0;
+  const regimeScore = regime === 'bullish' ? (newsEnabled ? 9 : 10) : 0;
+  const news = newsEnabled ? Math.max(0, Math.min(10, ((newsScore + 100) / 200) * 10)) : 0;
 
   return {
     trend,

@@ -56,7 +56,8 @@ export function App() {
   const [backtest, setBacktest] = useState<Awaited<ReturnType<typeof getBacktest>>>();
   const [settings, setSettings] = useState<SettingsType>();
   const [newsSummary, setNewsSummary] = useState<NewsSummaryResponse>();
-  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [globalNews, setGlobalNews] = useState<NewsArticle[]>([]);
+  const [productNews, setProductNews] = useState<NewsArticle[]>([]);
   const [selected, setSelected] = useState(
     () => new URLSearchParams(window.location.search).get('product') ?? '',
   );
@@ -93,7 +94,7 @@ export function App() {
     );
     setSettings(nextSettings);
     setNewsSummary(nextNewsSummary);
-    setNews(nextNews);
+    setGlobalNews(nextNews);
   };
 
   useEffect(() => {
@@ -107,7 +108,7 @@ export function App() {
       void Promise.all([getAnalysis(selected), getNews(selected, 10)]).then(
         ([nextAnalysis, nextNews]) => {
           setAnalysis({ ...nextAnalysis, news: nextAnalysis.news });
-          setNews(nextNews);
+          setProductNews(nextNews);
         },
       );
     }
@@ -181,7 +182,12 @@ export function App() {
         )}
         {page === 'Product' && (
           <PageErrorBoundary page="Product">
-            <Product id={selected} analysis={analysis} news={news} />
+            <Product
+              id={selected}
+              analysis={analysis}
+              news={productNews}
+              newsEnabled={settings?.newsEnabled}
+            />
           </PageErrorBoundary>
         )}
         {page === 'Backtest' && (
@@ -191,7 +197,7 @@ export function App() {
         )}
         {page === 'News' && (
           <PageErrorBoundary page="News">
-            <News summary={newsSummary} articles={news} onSelect={navigateProduct} />
+            <News summary={newsSummary} articles={globalNews} onSelect={navigateProduct} />
           </PageErrorBoundary>
         )}
         {page === 'Settings' && (

@@ -8,8 +8,14 @@ import {
   tagAssets,
 } from '../core/sentiment.js';
 import type { AssetNewsSummary, FearGreedPoint, NewsArticle } from '../core/types.js';
-import { fearGreedHistory, newsArticles, saveFearGreed, saveNewsArticle } from './db.js';
-import type { UniverseProduct } from '../shared/api.js';
+import {
+  blockingArticles,
+  fearGreedHistory,
+  newsArticles,
+  saveFearGreed,
+  saveNewsArticle,
+} from './db.js';
+import type { Settings, UniverseProduct } from '../shared/api.js';
 
 const RSS_FEEDS = [
   ['coindesk', 'https://www.coindesk.com/arc/outboundfeeds/rss'],
@@ -37,14 +43,6 @@ interface NewsState {
 
 let state: NewsState = { trending: [] };
 
-function text(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object' && '__cdata' in value) {
-    return String((value as { __cdata: unknown }).__cdata ?? '');
-  }
-  return '';
-}
-
 function stripHtml(value: string): string {
   return value
     .replace(/<[^>]*>/g, ' ')
@@ -52,12 +50,26 @@ function stripHtml(value: string): string {
     .trim();
 }
 
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#([0-9]+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10)),
+    )
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+}
+
 function first(value: unknown): string {
   if (Array.isArray(value)) return first(value[0]);
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
-    const candidate = value as { '#text'?: unknown; '@_href'?: unknown };
-    return String(candidate['#text'] ?? candidate['@_href'] ?? '');
+    const candidate = value as { '#text'?: unknown; __cdata?: unknown; '@_href'?: unknown };
+    return String(candidate.__cdata ?? candidate['#text'] ?? candidate['@_href'] ?? '');
   }
   return '';
 }
@@ -80,8 +92,8 @@ function parseFeed(
   return (Array.isArray(items) ? items : [items]).flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
     const row = item as Record<string, unknown>;
-    const title = stripHtml(first(row.title));
-    const summary = stripHtml(first(row.description ?? row.summary ?? row.content));
+    const title = stripHtml(decodeEntities(first(row.title)));
+    const summary = stripHtml(decodeEntities(first(row.description ?? row.summary ?? row.content)));
     const link = first(row.link ?? row.guid);
     const published = Date.parse(first(row.pubDate ?? row.published ?? row.updated ?? row.date));
     if (!title || !link || !Number.isFinite(published)) return [];
@@ -231,6 +243,25 @@ export function productNews(productId: string, limit = 10): NewsArticle[] {
 
 export function allNews(limit = 100): NewsArticle[] {
   return newsArticles(undefined, limit);
+}
+
+export function newsContext(
+  productId: string,
+  settings: Pick<Settings, 'newsEnabled' | 'newsBlockHours'>,
+): { score: number; blocked: boolean; catalysts: NewsArticle['catalysts'] } {
+  if (!settings.newsEnabled) {
+    return { score: 0, blocked: false, catalysts: [] };
+  }
+  const now = Date.now();
+  const summary = assetNewsScore(allNews(5000), productId, now);
+  const blocking = blockingArticles(productId, now - settings.newsBlockHours * 60 * 60 * 1000);
+  return {
+    score: summary.score,
+    blocked: blocking.length > 0,
+    catalysts: [
+      ...new Set([...summary.catalysts, ...blocking.flatMap((article) => article.catalysts)]),
+    ],
+  };
 }
 
 export function newsSummary(products: UniverseProduct[]): {

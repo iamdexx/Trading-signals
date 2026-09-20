@@ -22,6 +22,18 @@ describe('sentiment', () => {
     expect(scoreSentiment('ETF not approved')).toBeLessThan(0);
   });
 
+  it('covers crypto-finance positives, negatives, and neutral language', () => {
+    expect(scoreSentiment('Bitcoin ETF approval attracts institutional inflows')).toBeGreaterThan(
+      0,
+    );
+    expect(scoreSentiment('Partnership secures funding as adoption expands')).toBeGreaterThan(0);
+    expect(scoreSentiment('Token unlock triggers outflows and a plunge')).toBeLessThan(0);
+    expect(scoreSentiment('Exchange halted withdrawals and funds were frozen')).toBeLessThan(0);
+    expect(scoreSentiment('Fidelity surge is saving Bitcoin ETFs from a disastrous week')).toBe(0);
+    expect(scoreSentiment('Gen Z investing like Boomers')).toBe(0);
+    expect(scoreSentiment('Regulator denied the upgrade after a lawsuit')).toBeLessThan(0);
+  });
+
   it('requires uppercase exact matching for ambiguous symbols', () => {
     const assets = [
       { productId: 'SUI-USD', symbol: 'SUI', name: 'Sui Network' },

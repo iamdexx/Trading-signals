@@ -194,7 +194,14 @@ export function stepProduct(
   if (!nextBar || candle.time < nextState.cooldownUntil) {
     return { state: nextState, portfolio, events };
   }
-  const score = scoreAt(index, context.candles, indicators, regime, context.newsScore);
+  const score = scoreAt(
+    index,
+    context.candles,
+    indicators,
+    regime,
+    context.newsScore,
+    context.config.newsEnabled === true && context.newsScore !== undefined,
+  );
   const start = Math.max(0, index - 8);
   const recentPullback =
     indicators.rsi.slice(start, index).some((value) => value < 50) ||

@@ -47,7 +47,9 @@ An entry requires all of these conditions:
    cooldown has ended.
 
 Live scanner scores are out of 100: trend 22, pullback 22, momentum 14, volume 14, ADX 9,
-regime 9, and news 10. News is an overlay only; historical backtests do not use it. A signal on
+regime 9, and news 10. News is a live-only overlay; historical backtests do not use it. When
+`newsEnabled` is false, live scoring uses the technical-only 25/25/15/15/10/10 weighting and
+news contributes zero, so the score remains out of 100. A signal on
 bar `t` fills at the next bar's open with configured slippage.
 
 Initial risk is `stopAtrMult` ATR at entry. When `partialEnabled` is true, `targetR` triggers a

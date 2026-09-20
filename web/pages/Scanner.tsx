@@ -59,13 +59,13 @@ export function Scanner({
               <td>
                 <span className={`badge ${row.regime}`}>{row.regime}</span>
               </td>
-              <td>{row.score}</td>
+              <td>{row.score.toFixed(1)}</td>
               <td>{Number.isFinite(row.rsi) ? row.rsi.toFixed(2) : '—'}</td>
               <td>{Number.isFinite(row.adx) ? row.adx.toFixed(2) : '—'}</td>
               <td>{Number.isFinite(row.atrPct) ? `${row.atrPct.toFixed(2)}%` : '—'}</td>
               <td>
                 <span className={`tag ${row.newsScore >= 0 ? 'bullish' : 'bearish'}`}>
-                  {row.newsScore.toFixed(0)}
+                  {row.newsScore.toFixed(1)}
                 </span>
                 {row.newsCount > 0 && <small className="muted"> · {row.newsCount}</small>}
               </td>

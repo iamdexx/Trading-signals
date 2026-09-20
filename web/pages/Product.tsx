@@ -3,14 +3,20 @@ import { CandleChart } from '../components/CandleChart';
 import { ScoreBreakdown } from '../components/ScoreBreakdown';
 import { SignalsTable } from '../components/SignalsTable';
 
+function sentimentLabel(score: number): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
+  return score > 0.15 ? 'POSITIVE' : score < -0.15 ? 'NEGATIVE' : 'NEUTRAL';
+}
+
 export function Product({
   id,
   analysis,
   news,
+  newsEnabled,
 }: {
   id: string;
   analysis?: AnalysisResponse;
   news: NewsArticle[];
+  newsEnabled?: boolean;
 }) {
   if (!analysis) return <section className="panel">Loading {id}…</section>;
   const latest = analysis.candles.at(-2);
@@ -51,20 +57,30 @@ export function Product({
         ))}
       </section>
       <section className="panel">
-        <h2>Score breakdown · {analysis.score.total}/100</h2>
-        <ScoreBreakdown score={analysis.score} />
+        <h2>Score breakdown · {analysis.score.total.toFixed(1)}/100</h2>
+        <ScoreBreakdown score={analysis.score} newsEnabled={newsEnabled} />
       </section>
       <section className="panel">
-        <h2>Asset news · {analysis.news.score.toFixed(0)}</h2>
+        <h2>Asset news · {analysis.news.score.toFixed(1)}</h2>
         <div className="news-feed">
           {news.slice(0, 10).map((article) => (
             <article className="news-item" key={article.id}>
               <div className="news-meta">
                 <span>{article.source}</span>
                 <span>{new Date(article.published).toLocaleString()}</span>
-                <span className={article.sentiment >= 0 ? 'buy' : 'sell'}>
-                  {article.sentiment >= 0 ? '+' : ''}
+                <span
+                  className={
+                    sentimentLabel(article.sentiment) === 'POSITIVE'
+                      ? 'buy'
+                      : sentimentLabel(article.sentiment) === 'NEGATIVE'
+                        ? 'sell'
+                        : 'muted'
+                  }
+                >
+                  {sentimentLabel(article.sentiment) === 'POSITIVE' ? '+' : ''}
                   {(article.sentiment * 100).toFixed(0)}
+                  {' · '}
+                  {sentimentLabel(article.sentiment)}
                 </span>
               </div>
               <a href={article.link} target="_blank" rel="noreferrer">

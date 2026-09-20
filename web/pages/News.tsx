@@ -6,6 +6,10 @@ function age(timestamp: number): string {
   return hours < 1 ? 'under 1h' : `${Math.floor(hours)}h ago`;
 }
 
+function sentimentLabel(score: number): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
+  return score > 0.15 ? 'POSITIVE' : score < -0.15 ? 'NEGATIVE' : 'NEUTRAL';
+}
+
 export function News({
   summary,
   articles,
@@ -97,8 +101,16 @@ export function News({
               <div className="news-meta">
                 <span>{article.source}</span>
                 <span>{age(article.published)}</span>
-                <span className={article.sentiment >= 0 ? 'buy' : 'sell'}>
-                  {article.sentiment >= 0 ? 'POSITIVE' : 'NEGATIVE'}
+                <span
+                  className={
+                    sentimentLabel(article.sentiment) === 'POSITIVE'
+                      ? 'buy'
+                      : sentimentLabel(article.sentiment) === 'NEGATIVE'
+                        ? 'sell'
+                        : 'muted'
+                  }
+                >
+                  {sentimentLabel(article.sentiment)}
                 </span>
               </div>
               <a href={article.link} target="_blank" rel="noreferrer">
