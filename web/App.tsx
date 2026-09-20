@@ -163,8 +163,10 @@ export function App() {
           ))}
         </nav>
         <span className="live">
-          ● {settings?.mode === 'manual' ? 'MANUAL MODE' : 'PAPER MODE'} ·{' '}
-          {settings?.timeframe ?? '—'}
+          <span className="mode-label">
+            ● {settings?.mode === 'manual' ? 'MANUAL MODE' : 'PAPER MODE'}
+          </span>
+          <span className="timeframe-label"> · {settings?.timeframe ?? '—'}</span>
         </span>
         <span className={`market-badge ${health?.marketRegime ?? 'unknown'}`}>
           MARKET:{' '}
@@ -192,7 +194,7 @@ export function App() {
           {health.errors.map((error) => `${error.productId}: ${error.message}`).join(' · ')}
         </div>
       )}
-      <main>
+      <main className="page">
         {page === 'Overview' && (
           <PageErrorBoundary page="Overview">
             {portfolio && (

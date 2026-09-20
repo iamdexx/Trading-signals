@@ -45,30 +45,32 @@ export function Backtest({ report }: { report?: BacktestReport }) {
       </section>
       <section className="panel">
         <h2>Per-product breakdown</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>PRODUCT</th>
-              <th>TRADES</th>
-              <th>WIN RATE</th>
-              <th>PROFIT FACTOR</th>
-              <th>EXPECTANCY R</th>
-              <th>NET P&amp;L $</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(report.perProduct ?? {}).map(([product, item]) => (
-              <tr key={product}>
-                <td className="coin">{product}</td>
-                <td>{item.trades.length}</td>
-                <td>{metric(item.winRate * 100, 1, '%')}</td>
-                <td>{metric(item.profitFactor, 2)}</td>
-                <td>{metric(item.expectancyR, 3)}</td>
-                <td>${metric(item.netPnl, 2)}</td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>PRODUCT</th>
+                <th>TRADES</th>
+                <th>WIN RATE</th>
+                <th>PROFIT FACTOR</th>
+                <th>EXPECTANCY R</th>
+                <th>NET P&amp;L $</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Object.entries(report.perProduct ?? {}).map(([product, item]) => (
+                <tr key={product}>
+                  <td className="coin">{product}</td>
+                  <td>{item.trades.length}</td>
+                  <td>{metric(item.winRate * 100, 1, '%')}</td>
+                  <td>{metric(item.profitFactor, 2)}</td>
+                  <td>{metric(item.expectancyR, 3)}</td>
+                  <td>${metric(item.netPnl, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </>
   );

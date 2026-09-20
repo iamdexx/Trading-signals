@@ -140,59 +140,63 @@ export function Ledger({
       )}
       <section className="panel">
         <h2>Holdings</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>PRODUCT</th>
-              <th>QTY</th>
-              <th>AVG COST</th>
-              <th>VALUE</th>
-              <th>UNREALIZED</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(portfolio?.holdings ?? []).map((holding) => (
-              <tr key={holding.productId}>
-                <td className="coin">{holding.productId}</td>
-                <td>{holding.quantity.toFixed(8)}</td>
-                <td>${holding.avgCost.toFixed(2)}</td>
-                <td>${holding.marketValue.toFixed(2)}</td>
-                <td className={holding.unrealizedPnl >= 0 ? 'buy' : 'sell'}>
-                  ${holding.unrealizedPnl.toFixed(2)} ({holding.unrealizedPct.toFixed(2)}%)
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>PRODUCT</th>
+                <th>QTY</th>
+                <th>AVG COST</th>
+                <th>VALUE</th>
+                <th>UNREALIZED</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(portfolio?.holdings ?? []).map((holding) => (
+                <tr key={holding.productId}>
+                  <td className="coin">{holding.productId}</td>
+                  <td>{holding.quantity.toFixed(8)}</td>
+                  <td>${holding.avgCost.toFixed(2)}</td>
+                  <td>${holding.marketValue.toFixed(2)}</td>
+                  <td className={holding.unrealizedPnl >= 0 ? 'buy' : 'sell'}>
+                    ${holding.unrealizedPnl.toFixed(2)} ({holding.unrealizedPct.toFixed(2)}%)
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section className="panel">
         <h2>Entries</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>TIME</th>
-              <th>TYPE</th>
-              <th>PRODUCT</th>
-              <th>QTY</th>
-              <th>PRICE / USD</th>
-              <th>FEE</th>
-              <th>NOTE</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td>{new Date(entry.timestamp).toLocaleString()}</td>
-                <td>{entry.type}</td>
-                <td>{entry.productId ?? 'USD'}</td>
-                <td>{entry.quantity ?? '—'}</td>
-                <td>${(entry.price ?? 0).toFixed(2)}</td>
-                <td>${entry.feeUsd.toFixed(2)}</td>
-                <td>{entry.note ?? '—'}</td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>TIME</th>
+                <th>TYPE</th>
+                <th>PRODUCT</th>
+                <th>QTY</th>
+                <th>PRICE / USD</th>
+                <th>FEE</th>
+                <th>NOTE</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                  <td>{entry.type}</td>
+                  <td>{entry.productId ?? 'USD'}</td>
+                  <td>{entry.quantity ?? '—'}</td>
+                  <td>${(entry.price ?? 0).toFixed(2)}</td>
+                  <td>${entry.feeUsd.toFixed(2)}</td>
+                  <td>{entry.note ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </>
   );

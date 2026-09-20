@@ -125,10 +125,18 @@
 * {
   box-sizing: border-box;
 }
+html {
+  overflow-x: hidden;
+}
 body {
   margin: 0;
   background: radial-gradient(circle at 80% -20%, #183047 0, #080d16 45%);
   min-height: 100vh;
+  overflow-x: hidden;
+}
+.app {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 header {
   height: 72px;
@@ -186,11 +194,22 @@ nav button:hover {
 }
 main {
   max-width: 1250px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 46px 24px 100px;
 }
+.page {
+  max-width: 100%;
+}
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .hero,
 .section-title {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 28px;
@@ -242,6 +261,7 @@ h1 {
   padding: 22px;
   margin-bottom: 22px;
   overflow: auto;
+  max-width: 100%;
 }
 .panel h2 {
   font-size: 14px;
@@ -251,6 +271,7 @@ h1 {
 .chart {
   min-height: 220px;
   width: 100%;
+  max-width: 100%;
 }
 .chart.large {
   min-height: 420px;
@@ -428,23 +449,56 @@ footer {
   display: grid;
   gap: 3px;
 }
-@media (max-width: 750px) {
+@media (max-width: 767px) {
   header {
-    padding: 0 15px;
-    gap: 10px;
+    height: auto;
+    min-height: 72px;
+    padding: 10px 15px 0;
+    gap: 8px 10px;
+    flex-wrap: wrap;
+    align-content: center;
   }
   .brand {
     font-size: 12px;
+    flex: 1 1 125px;
+    min-width: 0;
+  }
+  .live,
+  .market-badge,
+  .heartbeat-badge {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 5px 6px;
+    max-width: 32vw;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .timeframe-label {
+    display: none;
+  }
+  nav {
+    order: 4;
+    flex: 1 0 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
   }
   nav button {
-    padding: 8px 5px;
+    flex: 0 0 auto;
+    padding: 8px 7px;
     font-size: 11px;
-  }
-  .live {
-    display: none;
   }
   main {
     padding: 25px 12px 100px;
+  }
+  .hero,
+  .section-title {
+    flex-wrap: wrap;
   }
   .hero {
     display: block;
@@ -455,5 +509,12 @@ footer {
   }
   h1 {
     font-size: 26px;
+  }
+  .cards,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-actions {
+    flex-wrap: wrap;
   }
 }
