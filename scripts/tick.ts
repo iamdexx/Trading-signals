@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AnalysisResponse, Heartbeat } from '../shared/api.js';
 import { exportState, getSettings, importState, resetPaper, saveSettings } from '../server/db.js';
+import type { BacktestReport } from '../core/types.js';
 
 process.env.RUN_SERVER = 'false';
 const runtime = await import('../server/index.js');
@@ -26,7 +27,7 @@ let heartbeat: Heartbeat = {
 function writeJson(relativePath: string, value: unknown): void {
   const target = path.join(outputDirectory, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`);
+  fs.writeFileSync(target, `${JSON.stringify(value)}\n`);
 }
 
 function saveHeartbeat(): void {
@@ -48,6 +49,36 @@ function trimAnalysis(result: AnalysisResponse): AnalysisResponse {
       adx: result.indicators.adx.slice(start),
       atrPct: result.indicators.atrPct.slice(start),
     },
+    backtest: snapshotBacktest(result.backtest),
+  };
+}
+
+function downsampleCurve(curve: BacktestReport['equityCurve']): BacktestReport['equityCurve'] {
+  if (curve.length <= 600) {
+    return curve;
+  }
+  return Array.from({ length: 600 }, (_, index) => {
+    const sourceIndex = Math.round((index * (curve.length - 1)) / 599);
+    return curve[sourceIndex];
+  });
+}
+
+function snapshotBacktest(report: BacktestReport, combined = false): BacktestReport {
+  const perProduct = report.perProduct
+    ? Object.fromEntries(
+        Object.entries(report.perProduct).map(([productId, productReport]) => [
+          productId,
+          combined
+            ? { ...productReport, trades: [], equityCurve: [] }
+            : snapshotBacktest(productReport),
+        ]),
+      )
+    : undefined;
+  return {
+    ...report,
+    trades: report.trades,
+    equityCurve: downsampleCurve(report.equityCurve),
+    ...(perProduct ? { perProduct } : {}),
   };
 }
 
@@ -102,7 +133,10 @@ try {
   writeJson('api/signals.json', handlers.signalsResponse(200));
   writeJson('api/news.json', handlers.newsResponse(undefined, 200));
   writeJson('api/news-summary.json', handlers.newsSummaryResponse());
-  writeJson('api/backtest.json', handlers.backtestResponse(runtime.handlerContext));
+  writeJson(
+    'api/backtest.json',
+    snapshotBacktest(handlers.backtestResponse(runtime.handlerContext), true),
+  );
 
   for (const product of products) {
     const productId = product.product_id;
@@ -111,7 +145,7 @@ try {
       writeJson(`api/products/${productId}/analysis.json`, trimAnalysis(analysis));
     }
     writeJson(`api/products/${productId}/news.json`, handlers.newsResponse(productId, 10));
-    const backtest = handlers.backtestResponse(runtime.handlerContext, productId);
+    const backtest = snapshotBacktest(handlers.backtestResponse(runtime.handlerContext, productId));
     writeJson(`api/backtest/${productId}.json`, backtest);
     const diagnostics = handlers.diagnosticsResponse(runtime.handlerContext, productId);
     writeJson(`api/diagnostics/${productId}.json`, diagnostics);
