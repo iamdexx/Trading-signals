@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { LedgerEntry } from '../core/ledger.js';
 import { exitLegPnl } from '../core/pnl.js';
 import type { Candle, Catalyst, FearGreedPoint, NewsArticle, Signal } from '../core/types.js';
 import type { PositionResponse, Settings, UniverseProduct } from '../shared/api.js';
@@ -100,6 +101,19 @@ db.exec(`
     value INTEGER NOT NULL,
     classification TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS ledger (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    product TEXT,
+    quantity REAL,
+    price REAL,
+    fee_usd REAL NOT NULL DEFAULT 0,
+    timestamp INTEGER NOT NULL,
+    note TEXT,
+    source TEXT NOT NULL,
+    ref TEXT
+  );
+  CREATE INDEX IF NOT EXISTS ledger_timestamp_idx ON ledger(timestamp DESC);
 `);
 
 try {
@@ -324,6 +338,47 @@ export function isBlockingArticle(
   );
 }
 
+export function ledgerEntries(): LedgerEntry[] {
+  const rows = db.prepare('SELECT * FROM ledger ORDER BY timestamp ASC,id ASC').all() as Array<{
+    id: string;
+    type: LedgerEntry['type'];
+    product?: string;
+    quantity?: number;
+    price?: number;
+    fee_usd: number;
+    timestamp: number;
+    note?: string;
+    source: LedgerEntry['source'];
+    ref?: string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    ...(row.product == null ? {} : { productId: row.product }),
+    ...(row.quantity == null ? {} : { quantity: row.quantity }),
+    ...(row.price == null ? {} : { price: row.price }),
+    feeUsd: row.fee_usd,
+    timestamp: row.timestamp,
+    ...(row.note == null ? {} : { note: row.note }),
+    source: row.source,
+    ...(row.ref == null ? {} : { ref: row.ref }),
+  }));
+}
+
+export function appendLedgerEntry(entry: LedgerEntry): void {
+  db.prepare(
+    `INSERT INTO ledger(id,type,product,quantity,price,fee_usd,timestamp,note,source,ref)
+     VALUES (@id,@type,@productId,@quantity,@price,@feeUsd,@timestamp,@note,@source,@ref)`,
+  ).run({
+    ...entry,
+    productId: entry.productId ?? null,
+    quantity: entry.quantity ?? null,
+    price: entry.price ?? null,
+    note: entry.note ?? null,
+    ref: entry.ref ?? null,
+  });
+}
+
 export function saveFearGreed(points: FearGreedPoint[]): void {
   const statement = db.prepare(
     'INSERT OR REPLACE INTO fear_greed(timestamp,value,classification) VALUES (?,?,?)',
@@ -536,11 +591,12 @@ export function equity(): {
       realized: number;
       unrealized: number;
       time: number;
-    }) ?? { value: 10000, realized: 0, unrealized: 0, time: 0 }
+    }) ?? { value: getSettings().startingEquity, realized: 0, unrealized: 0, time: 0 }
   );
 }
 
 const defaultSettings: Settings = {
+  mode: 'paper',
   startingEquity: Number(process.env.STARTING_EQUITY ?? 10000),
   sizingMode: 'risk_pct',
   riskPerTrade: Number(process.env.RISK_PER_TRADE ?? 0.01),
@@ -598,7 +654,7 @@ export function setProcessedBar(product: string, time: number): void {
 
 export function resetPaper(): void {
   db.exec(
-    'DELETE FROM positions; DELETE FROM signals; DELETE FROM equity; DELETE FROM processed_bars;',
+    'DELETE FROM positions; DELETE FROM signals; DELETE FROM equity; DELETE FROM processed_bars; DELETE FROM ledger;',
   );
   const settings = getSettings();
   saveEquity(Date.now(), settings.startingEquity, 0, 0);
@@ -626,6 +682,7 @@ export interface ExportedState {
   signals: Array<Record<string, unknown>>;
   equity: Array<Record<string, unknown>>;
   processed: Array<Record<string, unknown>>;
+  ledger: LedgerEntry[];
 }
 
 export function exportState(): ExportedState {
@@ -643,13 +700,14 @@ export function exportState(): ExportedState {
     processed: db.prepare('SELECT * FROM processed_bars ORDER BY product').all() as Array<
       Record<string, unknown>
     >,
+    ledger: ledgerEntries(),
   };
 }
 
-export function importState(state: ExportedState): void {
-  const transaction = db.transaction((snapshot: ExportedState) => {
+export function importState(state: ExportedState & { ledger?: LedgerEntry[] }): void {
+  const transaction = db.transaction((snapshot: ExportedState & { ledger?: LedgerEntry[] }) => {
     db.exec(
-      'DELETE FROM positions; DELETE FROM signals; DELETE FROM equity; DELETE FROM processed_bars;',
+      'DELETE FROM positions; DELETE FROM signals; DELETE FROM equity; DELETE FROM processed_bars; DELETE FROM ledger;',
     );
     saveSettings(snapshot.settings);
     const positionInsert = db.prepare(
@@ -675,6 +733,19 @@ export function importState(state: ExportedState): void {
       'INSERT INTO processed_bars(product,time) VALUES (@product,@time)',
     );
     for (const row of snapshot.processed) processedInsert.run(row);
+    for (const entry of snapshot.ledger ?? []) {
+      db.prepare(
+        `INSERT INTO ledger(id,type,product,quantity,price,fee_usd,timestamp,note,source,ref)
+         VALUES (@id,@type,@productId,@quantity,@price,@feeUsd,@timestamp,@note,@source,@ref)`,
+      ).run({
+        ...entry,
+        productId: entry.productId ?? null,
+        quantity: entry.quantity ?? null,
+        price: entry.price ?? null,
+        note: entry.note ?? null,
+        ref: entry.ref ?? null,
+      });
+    }
   });
   transaction(state);
 }

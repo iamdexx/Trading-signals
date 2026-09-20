@@ -3,6 +3,8 @@ import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
 import { buildRegimeMap, createEngineContext, stepProduct } from '../core/engine.js';
+import { computePortfolio } from '../core/ledger.js';
+import type { LedgerEntry } from '../core/ledger.js';
 import { unrealizedPnl } from '../core/pnl.js';
 import type { EngineState, Position, Regime, StrategyConfig } from '../core/types.js';
 import type { Heartbeat, Settings } from '../shared/api.js';
@@ -13,6 +15,7 @@ import {
   getSettings,
   insertSignal,
   latestCandleTime,
+  ledgerEntries as storedLedgerEntries,
   loadCandles,
   openPosition,
   positions,
@@ -30,6 +33,8 @@ import {
 import { newsContext, syncNews } from './news.js';
 import {
   analysisResponse,
+  createLedgerResponse,
+  ledgerResponse,
   backtestResponse,
   candlesResponse,
   diagnosticsResponse,
@@ -254,8 +259,19 @@ export async function paperTick(): Promise<void> {
     return;
   }
   const config = strategyConfig(settings);
+  const manualPortfolio =
+    settings.mode === 'manual'
+      ? computePortfolio(
+          storedLedgerEntries(),
+          Object.fromEntries(universe().map((product) => [product.product_id, product.price])),
+          Date.now(),
+        )
+      : undefined;
   const portfolio = equity();
-  const portfolioState = { equity: portfolio.value, realized: portfolio.realized };
+  const portfolioState = {
+    equity: manualPortfolio?.equity ?? portfolio.value,
+    realized: manualPortfolio?.realizedPnl ?? portfolio.realized,
+  };
   const marketDaily = cacheProduct('BTC-USD', 'ONE_DAY', 500);
   let unrealized = 0;
 
@@ -269,7 +285,9 @@ export async function paperTick(): Promise<void> {
         bars,
         daily,
         config,
-        positions().filter((item) => item.status === 'open').length,
+        settings.mode === 'manual'
+          ? 0
+          : positions().filter((item) => item.status === 'open').length,
         portfolioState,
         marketDaily,
       );
@@ -284,16 +302,22 @@ export async function paperTick(): Promise<void> {
         const result = stepProduct(state, index, {
           ...context,
           portfolio: portfolioState,
-          openPositions: positions().filter((item) => item.status === 'open').length,
+          openPositions:
+            settings.mode === 'manual'
+              ? 0
+              : positions().filter((item) => item.status === 'open').length,
         });
         state = result.state;
+        if (settings.mode === 'manual') {
+          state.position = undefined;
+        }
         portfolioState.equity = result.portfolio.equity;
         portfolioState.realized = result.portfolio.realized;
         for (const event of result.events) {
           if (event.signal) {
             insertSignal(event.signal);
           }
-          if (event.type === 'fill' && event.position) {
+          if (settings.mode !== 'manual' && event.type === 'fill' && event.position) {
             const storedPosition = event.position;
             if (storedPosition.status === 'open') {
               const id = savePosition(storedPosition as unknown as Record<string, unknown>);
@@ -302,7 +326,7 @@ export async function paperTick(): Promise<void> {
               updatePosition(storedPosition as unknown as Record<string, unknown>);
             }
           }
-          if (event.type === 'mark' && event.position?.id) {
+          if (settings.mode !== 'manual' && event.type === 'mark' && event.position?.id) {
             updatePosition(event.position as unknown as Record<string, unknown>);
           }
         }
@@ -320,7 +344,19 @@ export async function paperTick(): Promise<void> {
       setProductError(product.product_id, error instanceof Error ? error.message : String(error));
     }
   }
-  saveEquity(Date.now(), portfolioState.equity + unrealized, portfolioState.realized, unrealized);
+  if (settings.mode === 'manual') {
+    const latestPrices = Object.fromEntries(
+      universe().map((product) => [
+        product.product_id,
+        cacheProduct(product.product_id, settings.timeframe, 3000).at(-2)?.close ?? product.price,
+      ]),
+    );
+    const current = computePortfolio(storedLedgerEntries(), latestPrices, Date.now());
+    unrealized = current.holdings.reduce((total, holding) => total + holding.unrealizedPnl, 0);
+    saveEquity(Date.now(), current.equity, current.realizedPnl, unrealized);
+  } else {
+    saveEquity(Date.now(), portfolioState.equity + unrealized, portfolioState.realized, unrealized);
+  }
   heartbeat = {
     ...heartbeat,
     finishedAt: Date.now(),
@@ -349,7 +385,10 @@ function validateSettings(input: Partial<Settings>): string | undefined {
   ];
   for (const field of numericFields) {
     const value = input[field];
-    if (value !== undefined && (typeof value !== 'number' || value <= 0)) {
+    if (
+      value !== undefined &&
+      (typeof value !== 'number' || (field === 'startingEquity' ? value < 0 : value <= 0))
+    ) {
       return `${field} must be positive`;
     }
   }
@@ -364,6 +403,9 @@ function validateSettings(input: Partial<Settings>): string | undefined {
   }
   if (input.newsEnabled !== undefined && typeof input.newsEnabled !== 'boolean') {
     return 'newsEnabled must be boolean';
+  }
+  if (input.mode !== undefined && input.mode !== 'paper' && input.mode !== 'manual') {
+    return 'mode is invalid';
   }
   if (
     input.sizingMode !== undefined &&
@@ -395,8 +437,20 @@ app.get('/api/news', (request, response) => {
   response.json(newsResponse(productId, limit));
 });
 app.get('/api/news/summary', (_request, response) => response.json(newsSummaryResponse()));
-app.get('/api/positions', (_request, response) => response.json(positionsResponse()));
+app.get('/api/positions', (_request, response) => response.json(positionsResponse(handlerContext)));
 app.get('/api/portfolio', (_request, response) => response.json(portfolioResponse()));
+app.get('/api/ledger', (_request, response) => response.json(ledgerResponse()));
+app.post('/api/ledger', (request, response) => {
+  const result = createLedgerResponse({
+    ...(request.body as Record<string, unknown>),
+    source: 'api',
+  } as LedgerEntry);
+  if ('error' in result) {
+    response.status(400).json(result);
+    return;
+  }
+  response.status(201).json(result);
+});
 app.get('/api/products/:id/candles', (request, response) =>
   response.json(
     candlesResponse(

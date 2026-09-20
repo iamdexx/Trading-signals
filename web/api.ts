@@ -1,6 +1,8 @@
 import type {
   AnalysisResponse,
   HealthResponse,
+  LedgerEntry,
+  ManualPositionResponse,
   PortfolioResponse,
   PositionResponse,
   ScanRow,
@@ -66,8 +68,16 @@ export const staticMode = Boolean(snapshotBase);
 export const getHealth = () => request<HealthResponse>('/api/health');
 export const getUniverse = () => request<UniverseProduct[]>('/api/universe');
 export const getSignals = (limit = 50) => request<Signal[]>(`/api/signals?limit=${limit}`);
-export const getPositions = () => request<PositionResponse[]>('/api/positions');
+export const getPositions = () =>
+  request<Array<PositionResponse | ManualPositionResponse>>('/api/positions');
 export const getPortfolio = () => request<PortfolioResponse>('/api/portfolio');
+export const getLedger = () => request<LedgerEntry[]>('/api/ledger');
+export const postLedger = (entry: Omit<LedgerEntry, 'source'>) =>
+  request('/api/ledger', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
 export const getScan = () => request<ScanRow[]>('/api/scan');
 export const getNews = (product?: string, limit = 50) =>
   request<NewsArticle[]>(

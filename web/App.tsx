@@ -3,6 +3,8 @@ import type { Signal } from '../core/types';
 import type {
   AnalysisResponse,
   HealthResponse,
+  LedgerEntry,
+  ManualPositionResponse,
   NewsArticle,
   NewsSummaryResponse,
   PortfolioResponse,
@@ -16,6 +18,7 @@ import {
   getHealth,
   getNews,
   getNewsSummary,
+  getLedger,
   getPortfolio,
   getPositions,
   getScan,
@@ -31,9 +34,10 @@ import { Product } from './pages/Product';
 import { Scanner } from './pages/Scanner';
 import { Settings } from './pages/Settings';
 import { News } from './pages/News';
+import { Ledger } from './pages/Ledger';
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 
-type Page = 'Overview' | 'Scanner' | 'Product' | 'Backtest' | 'News' | 'Settings';
+type Page = 'Overview' | 'Scanner' | 'Product' | 'Backtest' | 'News' | 'Ledger' | 'Settings';
 
 function initialPage(): Page {
   const value = new URLSearchParams(window.location.search).get('page');
@@ -41,6 +45,7 @@ function initialPage(): Page {
     value === 'Product' ||
     value === 'Backtest' ||
     value === 'News' ||
+    value === 'Ledger' ||
     value === 'Settings'
     ? value
     : 'Overview';
@@ -50,7 +55,7 @@ export function App() {
   const [page, setPage] = useState<Page>(initialPage);
   const [health, setHealth] = useState<HealthResponse>();
   const [portfolio, setPortfolio] = useState<PortfolioResponse>();
-  const [positions, setPositions] = useState<PositionResponse[]>([]);
+  const [positions, setPositions] = useState<Array<PositionResponse | ManualPositionResponse>>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [scan, setScan] = useState<ScanRow[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse>();
@@ -59,6 +64,7 @@ export function App() {
   const [newsSummary, setNewsSummary] = useState<NewsSummaryResponse>();
   const [globalNews, setGlobalNews] = useState<NewsArticle[]>([]);
   const [productNews, setProductNews] = useState<NewsArticle[]>([]);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [selected, setSelected] = useState(
     () => new URLSearchParams(window.location.search).get('product') ?? '',
   );
@@ -73,6 +79,7 @@ export function App() {
       nextSettings,
       nextNewsSummary,
       nextNews,
+      nextLedger,
     ] = await Promise.all([
       getHealth(),
       getPortfolio(),
@@ -82,6 +89,7 @@ export function App() {
       getSettings(),
       getNewsSummary(),
       getNews(),
+      getLedger(),
     ]);
     setHealth(nextHealth);
     setPortfolio(nextPortfolio);
@@ -96,6 +104,7 @@ export function App() {
     setSettings(nextSettings);
     setNewsSummary(nextNewsSummary);
     setGlobalNews(nextNews);
+    setLedger(nextLedger);
   };
 
   useEffect(() => {
@@ -141,19 +150,22 @@ export function App() {
           <span className="pulse" /> COINBASE <b>SIGNALS</b>
         </div>
         <nav>
-          {(['Overview', 'Scanner', 'Product', 'Backtest', 'News', 'Settings'] as Page[]).map(
-            (item) => (
-              <button
-                className={page === item ? 'active' : ''}
-                key={item}
-                onClick={() => setPage(item)}
-              >
-                {item}
-              </button>
-            ),
-          )}
+          {(
+            ['Overview', 'Scanner', 'Product', 'Backtest', 'News', 'Ledger', 'Settings'] as Page[]
+          ).map((item) => (
+            <button
+              className={page === item ? 'active' : ''}
+              key={item}
+              onClick={() => setPage(item)}
+            >
+              {item}
+            </button>
+          ))}
         </nav>
-        <span className="live">● PAPER MODE · {settings?.timeframe ?? '—'}</span>
+        <span className="live">
+          ● {settings?.mode === 'manual' ? 'MANUAL MODE' : 'PAPER MODE'} ·{' '}
+          {settings?.timeframe ?? '—'}
+        </span>
         <span className={`market-badge ${health?.marketRegime ?? 'unknown'}`}>
           MARKET:{' '}
           {health?.marketRegime === 'bullish'
@@ -189,6 +201,7 @@ export function App() {
                 positions={positions}
                 signals={signals}
                 marketRegime={health?.marketRegime ?? 'unknown'}
+                mode={settings?.mode}
               />
             )}
           </PageErrorBoundary>
@@ -205,6 +218,7 @@ export function App() {
               analysis={analysis}
               news={productNews}
               newsEnabled={settings?.newsEnabled}
+              onLogTrade={() => setPage('Ledger')}
             />
           </PageErrorBoundary>
         )}
@@ -216,6 +230,11 @@ export function App() {
         {page === 'News' && (
           <PageErrorBoundary page="News">
             <News summary={newsSummary} articles={globalNews} onSelect={navigateProduct} />
+          </PageErrorBoundary>
+        )}
+        {page === 'Ledger' && (
+          <PageErrorBoundary page="Ledger">
+            <Ledger entries={ledger} portfolio={portfolio?.manual} product={selected} />
           </PageErrorBoundary>
         )}
         {page === 'Settings' && (

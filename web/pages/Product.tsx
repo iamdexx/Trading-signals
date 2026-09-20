@@ -12,11 +12,13 @@ export function Product({
   analysis,
   news,
   newsEnabled,
+  onLogTrade,
 }: {
   id: string;
   analysis?: AnalysisResponse;
   news: NewsArticle[];
   newsEnabled?: boolean;
+  onLogTrade?: () => void;
 }) {
   if (!analysis) return <section className="panel">Loading {id}…</section>;
   const latest = analysis.candles.at(-2);
@@ -32,6 +34,9 @@ export function Product({
           </span>
         </div>
         <span className={`tag ${analysis.regime}`}>{analysis.regime} regime</span>
+        <button className="primary" onClick={onLogTrade}>
+          Log trade
+        </button>
       </div>
       <section className="panel">
         <CandleChart

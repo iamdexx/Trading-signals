@@ -1,5 +1,7 @@
 import { backtestProduct, portfolioBacktest } from '../core/backtest.js';
 import { createEngineContext } from '../core/engine.js';
+import { computePortfolio, ledgerWarnings, validateEntry } from '../core/ledger.js';
+import type { LedgerEntry } from '../core/ledger.js';
 import { assetNewsScore } from '../core/sentiment.js';
 import type { Regime, StrategyConfig } from '../core/types.js';
 import type {
@@ -13,7 +15,9 @@ import type {
 import {
   db,
   equity,
+  appendLedgerEntry,
   getSettings,
+  ledgerEntries,
   openPosition,
   positions,
   productErrors,
@@ -67,13 +71,44 @@ function newsSummaryResponse() {
   return newsSummary(universe());
 }
 
-function positionsResponse() {
-  return positions();
+function manualPrices(): Record<string, number> {
+  return Object.fromEntries(universe().map((product) => [product.product_id, product.price]));
+}
+
+function manualPortfolio() {
+  return computePortfolio(ledgerEntries(), manualPrices(), Date.now());
+}
+
+function positionsResponse(context?: HandlerContext) {
+  const settings = getSettings();
+  if (settings.mode !== 'manual') {
+    return positions();
+  }
+  const scan = context ? scanResponse(context) : [];
+  return manualPortfolio().holdings.map((holding) => ({
+    ...holding,
+    currentPrice: manualPrices()[holding.productId] ?? 0,
+    signal: scan.find((row) => row.productId === holding.productId),
+  }));
 }
 
 function portfolioResponse() {
-  const latest = equity();
   const settings = getSettings();
+  if (settings.mode === 'manual') {
+    const manual = manualPortfolio();
+    const curve = db.prepare('SELECT time,value AS equity FROM equity ORDER BY time').all();
+    return {
+      equity: manual.equity,
+      realized: manual.realizedPnl,
+      unrealized: manual.holdings.reduce((total, holding) => total + holding.unrealizedPnl, 0),
+      drawdown: 0,
+      curve,
+      startDate: settings.startDate,
+      mode: settings.mode,
+      manual,
+    };
+  }
+  const latest = equity();
   const curve = db.prepare('SELECT time,value AS equity FROM equity ORDER BY time').all();
   return {
     equity: latest.value,
@@ -82,6 +117,33 @@ function portfolioResponse() {
     drawdown: 0,
     curve,
     startDate: settings.startDate,
+    mode: settings.mode,
+  };
+}
+
+function ledgerResponse() {
+  return ledgerEntries().sort((left, right) => right.timestamp - left.timestamp);
+}
+
+function createLedgerResponse(input: LedgerEntry) {
+  const settings = getSettings();
+  if (settings.mode !== 'manual') {
+    return { error: 'Manual ledger is disabled while mode is paper' };
+  }
+  const existing = ledgerEntries();
+  const error = validateEntry(input, existing);
+  if (error) return { error };
+  if (existing.some((entry) => entry.id === input.id)) {
+    return { error: `ledger entry ${input.id} already exists` };
+  }
+  appendLedgerEntry(input);
+  return {
+    entry: input,
+    warnings: ledgerWarnings(
+      input,
+      universe().map((product) => product.product_id),
+    ),
+    portfolio: manualPortfolio(),
   };
 }
 
@@ -382,6 +444,8 @@ export {
   newsResponse,
   newsSummaryResponse,
   portfolioResponse,
+  createLedgerResponse,
+  ledgerResponse,
   positionsResponse,
   resetResponse,
   scanResponse,

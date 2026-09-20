@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
+import { appendLedgerEntry, ledgerEntries, universe } from '../server/db.js';
+import { ledgerWarnings, validateEntry } from '../core/ledger.js';
+import type { LedgerEntry, LedgerEntryType } from '../core/ledger.js';
 import type { AnalysisResponse, Heartbeat } from '../shared/api.js';
 import { exportState, getSettings, importState, resetPaper, saveSettings } from '../server/db.js';
 import type { BacktestReport } from '../core/types.js';
@@ -33,6 +36,47 @@ function writeJson(relativePath: string, value: unknown): void {
 function saveHeartbeat(): void {
   runtime.setHeartbeat(heartbeat);
   writeJson('heartbeat.json', heartbeat);
+}
+
+function issueFields(body: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const match of body.matchAll(/###\s+([^\n]+)\n+([\s\S]*?)(?=\n###\s+|\s*$)/gi)) {
+    const key = match[1]
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+    fields[key] = match[2].trim().split('\n')[0].trim();
+  }
+  return fields;
+}
+
+function parseLedgerIssue(body: string, issueNumber?: string): LedgerEntry | string {
+  const fields = issueFields(body);
+  const type = fields.type?.toLowerCase() as LedgerEntryType | undefined;
+  if (!type || !['deposit', 'withdrawal', 'buy', 'sell'].includes(type)) {
+    return 'type must be deposit, withdrawal, buy, or sell';
+  }
+  const productId = fields.product?.trim().toUpperCase();
+  const quantity = fields.quantity ? Number(fields.quantity) : undefined;
+  const price = fields.price ? Number(fields.price) : undefined;
+  const feeUsd = fields.feeusd ? Number(fields.feeusd) : 0;
+  const timestamp = fields.timestamp ? Date.parse(fields.timestamp) : Date.now();
+  if (fields.timestamp && !Number.isFinite(timestamp)) return 'timestamp must be ISO or blank';
+  if (fields.quantity && !Number.isFinite(quantity)) return 'quantity must be numeric';
+  if (fields.price && !Number.isFinite(price)) return 'price must be numeric';
+  if (fields.feeusd && !Number.isFinite(feeUsd)) return 'fee must be numeric';
+  return {
+    id: issueNumber ? `issue-${issueNumber}` : `issue-${Date.now()}`,
+    type,
+    ...(productId ? { productId } : {}),
+    ...(quantity === undefined ? {} : { quantity }),
+    ...(price === undefined ? {} : { price }),
+    feeUsd,
+    timestamp,
+    ...(fields.note ? { note: fields.note } : {}),
+    source: 'issue',
+    ...(issueNumber ? { ref: issueNumber } : {}),
+  };
 }
 
 function trimAnalysis(result: AnalysisResponse): AnalysisResponse {
@@ -98,6 +142,36 @@ try {
   if (process.env.RESET_PAPER === '1' || process.env.RESET_PAPER === 'true') {
     resetPaper();
   }
+  let ledgerResult: {
+    accepted: boolean;
+    error?: string;
+    entry?: LedgerEntry;
+    warnings?: string[];
+  } = {
+    accepted: false,
+  };
+  if (process.env.LEDGER_ISSUE_BODY) {
+    const parsed = parseLedgerIssue(process.env.LEDGER_ISSUE_BODY, process.env.LEDGER_ISSUE_NUMBER);
+    if (typeof parsed === 'string') {
+      ledgerResult = { accepted: false, error: parsed };
+    } else {
+      const error = validateEntry(parsed, ledgerEntries());
+      if (error) {
+        ledgerResult = { accepted: false, error };
+      } else {
+        appendLedgerEntry(parsed);
+        ledgerResult = {
+          accepted: true,
+          entry: parsed,
+          warnings: ledgerWarnings(
+            parsed,
+            universe().map((product) => product.product_id),
+          ),
+        };
+      }
+    }
+  }
+  writeJson('ledger-result.json', ledgerResult);
 
   const refresh = await runtime.refreshUniverse();
   if (refresh.products === 0 || refresh.failures > refresh.products / 2) {
@@ -129,7 +203,8 @@ try {
   writeJson('api/universe.json', handlers.universeResponse());
   writeJson('api/scan.json', handlers.scanResponse(runtime.handlerContext));
   writeJson('api/portfolio.json', handlers.portfolioResponse());
-  writeJson('api/positions.json', handlers.positionsResponse());
+  writeJson('api/positions.json', handlers.positionsResponse(runtime.handlerContext));
+  writeJson('api/ledger.json', handlers.ledgerResponse());
   writeJson('api/signals.json', handlers.signalsResponse(200));
   writeJson('api/news.json', handlers.newsResponse(undefined, 200));
   writeJson('api/news-summary.json', handlers.newsSummaryResponse());
