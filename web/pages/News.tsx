@@ -29,11 +29,11 @@ export function News({
     <>
       <div className="section-title">
         <div>
-          <p className="eyebrow">LIVE NEWS & SENTIMENT</p>
-          <h1>Market intelligence</h1>
+          <p className="eyebrow">NEWS</p>
+          <h1>Good news, bad news, and everything between</h1>
         </div>
         <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-          <option value="">All assets</option>
+          <option value="">All coins</option>
           {[...new Set(articles.flatMap((article) => article.assets))].map((asset) => (
             <option value={asset} key={asset}>
               {asset}
@@ -43,14 +43,14 @@ export function News({
       </div>
       <section className="cards">
         <div className="metric panel sentiment-card">
-          <small>MARKET SENTIMENT</small>
+          <small>MARKET MOOD</small>
           <strong className={summary && summary.marketSentiment >= 0 ? 'buy' : 'sell'}>
             {summary ? summary.marketSentiment.toFixed(0) : '—'}
           </strong>
-          <span className="muted">Weighted live article score + Fear & Greed</span>
+          <span className="muted">A simple view of recent headlines and Fear &amp; Greed.</span>
         </div>
         <div className="metric panel">
-          <small>FEAR & GREED</small>
+          <small>FEAR &amp; GREED</small>
           <strong>{latestFearGreed?.value ?? '—'}</strong>
           <span className="muted">{latestFearGreed?.classification ?? 'Loading'}</span>
           <div className="fear-gauge">
@@ -74,7 +74,7 @@ export function News({
         </div>
       </section>
       <section className="panel">
-        <h2>Trending in universe</h2>
+        <h2>Coins people are talking about</h2>
         <div className="chip-list">
           {(summary?.trending ?? []).map((asset) => (
             <button
@@ -92,7 +92,7 @@ export function News({
       </section>
       <section className="panel">
         <div className="section-title">
-          <h2>Headlines</h2>
+          <h2>Latest headlines</h2>
           <span className="muted">{filtered.length} articles</span>
         </div>
         <div className="news-feed">
@@ -110,7 +110,11 @@ export function News({
                         : 'muted'
                   }
                 >
-                  {sentimentLabel(article.sentiment)}
+                  {sentimentLabel(article.sentiment) === 'POSITIVE'
+                    ? 'GOOD NEWS'
+                    : sentimentLabel(article.sentiment) === 'NEGATIVE'
+                      ? 'BAD NEWS'
+                      : 'NEUTRAL'}
                 </span>
               </div>
               <a href={article.link} target="_blank" rel="noreferrer">

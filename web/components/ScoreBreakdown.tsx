@@ -9,12 +9,12 @@ export function ScoreBreakdown({
 }) {
   const technicalOnly = newsEnabled === false || score.trend === 25 || score.pullback === 25;
   const entries = [
-    ['Trend', score.trend, technicalOnly ? 25 : 22],
-    ['Pullback', score.pullback, technicalOnly ? 25 : 22],
+    ['Uptrend', score.trend, technicalOnly ? 25 : 22],
+    ['Dip', score.pullback, technicalOnly ? 25 : 22],
     ['Momentum', score.momentum, technicalOnly ? 15 : 14],
-    ['Volume', score.volume, technicalOnly ? 15 : 14],
-    ['ADX', score.adx, technicalOnly ? 10 : 9],
-    ['Regime', score.regime, technicalOnly ? 10 : 9],
+    ['Trading activity', score.volume, technicalOnly ? 15 : 14],
+    ['Trend strength (ADX)', score.adx, technicalOnly ? 10 : 9],
+    ['Market trend', score.regime, technicalOnly ? 10 : 9],
     ['News', score.news, 10],
   ];
   return (
