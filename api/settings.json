@@ -1,0 +1,1 @@
+{"mode":"manual","startingEquity":0,"sizingMode":"risk_pct","riskPerTrade":0.01,"fixedUsdPerTrade":100,"maxPositions":5,"maxNotionalPct":0.2,"stopAtrMult":3,"targetR":1.5,"trailAtrMult":3,"partialEnabled":true,"newsEnabled":true,"newsBlockHours":48,"feeBps":60,"slippageBps":5,"universeSize":30,"timeframe":"FOUR_HOUR","startDate":1789878986096}
